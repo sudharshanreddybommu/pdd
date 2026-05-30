@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "FinalPDD",
-    "slug": "final-pdd",
+    "name": "OralScan AI",
+    "slug": "oralscan-ai",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -18,22 +18,22 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow FinalPDD to access your camera to scan QR codes."
+          "cameraPermission": "Allow OralScan AI to access your camera for oral health screening."
         }
       ],
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow FinalPDD to access your photos to upload payment proof."
+          "photosPermission": "Allow OralScan AI to access your photos to upload images."
         }
       ]
     ],
     "ios": {
-      "bundleIdentifier": "com.sudha.finalpdd",
+      "bundleIdentifier": "com.sudha.oralscanai",
       "supportsTablet": true
     },
     "android": {
-      "package": "com.sudha.finalpdd",
+      "package": "com.sudha.oralscanai",
       "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",

@@ -94,7 +94,7 @@ export default function App() {
     return (
       <View style={[styles.container, styles.center]}>
         <ActivityIndicator size="large" color="#0ea5e9" />
-        <Text style={styles.loadingText}>Initializing OPMD App...</Text>
+        <Text style={styles.loadingText}>Initializing OralScan AI...</Text>
       </View>
     );
   }
@@ -110,7 +110,7 @@ export default function App() {
         <SafeAreaView style={styles.safeArea}>
           <View style={styles.formContainer}>
             <View style={styles.headerContainer}>
-              <Text style={styles.logoText}>🏥 OPMD Portal</Text>
+              <Text style={styles.logoText}>🦷 OralScan AI</Text>
               <Text style={styles.subText}>Run the Web App directly on your Phone</Text>
             </View>
 
