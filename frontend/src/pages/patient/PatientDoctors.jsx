@@ -63,10 +63,21 @@ export default function PatientDoctors() {
           <div className="awareness-grid">
             {filtered.map(doc => (
               <div className="doctor-card" key={doc.id}>
-                <div className="doctor-avatar">
-                  {(doc.name || 'D').charAt(0).toUpperCase()}
+                <div className="doctor-avatar" style={{ overflow: 'hidden' }}>
+                  {doc.profile_image ? (
+                    <img src={doc.profile_image} alt={doc.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    (doc.name || 'D').charAt(0).toUpperCase()
+                  )}
                 </div>
                 <div className="doctor-name">Dr. {doc.name}</div>
+                {doc.avg_rating && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, fontSize: 13 }}>
+                    <span style={{ color: '#fbbf24' }}>★</span>
+                    <span style={{ fontWeight: 700 }}>{Number(doc.avg_rating).toFixed(1)}</span>
+                    <span style={{ color: 'var(--text-muted)' }}>({doc.review_count} reviews)</span>
+                  </div>
+                )}
                 <div className="doctor-hospital">🏥 {doc.hospital || 'Hospital not specified'}</div>
                 {doc.specialization && (
                   <div className="tag" style={{ marginBottom: 12 }}>{doc.specialization}</div>
@@ -76,13 +87,25 @@ export default function PatientDoctors() {
                   {doc.address && <div className="doctor-info-item">📍 <span>{doc.address}</span></div>}
                 </div>
                 <div className="divider" />
-                <button
-                  onClick={() => handleRequest(doc.id)}
-                  className="btn btn-primary btn-block"
-                  disabled={requesting === doc.id}
-                >
-                  {requesting === doc.id ? <div className="spinner" /> : '📅 Request Appointment'}
-                </button>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button
+                    onClick={() => handleRequest(doc.id)}
+                    className="btn btn-primary"
+                    style={{ flex: 1 }}
+                    disabled={requesting === doc.id}
+                  >
+                    {requesting === doc.id ? <div className="spinner" /> : '📅 Appointment'}
+                  </button>
+                  <a
+                    href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(doc.address || doc.hospital || '')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn btn-secondary"
+                    title="View on Maps"
+                  >
+                    📍 Maps
+                  </a>
+                </div>
               </div>
             ))}
           </div>

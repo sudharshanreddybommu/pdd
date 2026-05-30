@@ -1,17 +1,39 @@
 import { useState, useEffect } from 'react'
 import { toast } from 'react-toastify'
-import { getPatientAppointments, getNotifications, markNotificationsRead } from '../../services/api'
+import { getPatientAppointments, getNotifications, markNotificationsRead, clearNotifications, addReview, confirmPayment } from '../../services/api'
 import PatientNavbar from '../../components/PatientNavbar'
 
-const STATUS_LABEL = { pending: '⏳ Pending', scheduled: '✅ Scheduled', completed: '🎉 Completed' }
+const STATUS_LABEL = {
+  pending: '⏳ Pending',
+  scheduled: '💳 Payment Pending',
+  confirmed: '✅ Confirmed',
+  completed: '🎉 Completed',
+  rejected: '❌ Declined'
+}
 
 export default function PatientAppointments() {
   const [appointments, setAppointments] = useState([])
   const [notifications, setNotifications] = useState([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('appointments')
+  const [reviewing, setReviewing] = useState(null)
+  const [reviewForm, setReviewForm] = useState({ rating: 5, comment: '' })
+  const [showOPForm, setShowOPForm] = useState(null)
+  const [screenshots, setScreenshots] = useState({})
 
-  useEffect(() => {
+  const handleScreenshotUpload = (apptId, e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        setScreenshots(prev => ({ ...prev, [apptId]: evt.target.result }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const load = () => {
+    setLoading(true)
     Promise.all([getPatientAppointments(), getNotifications()])
       .then(([apptRes, notifRes]) => {
         setAppointments(apptRes.data)
@@ -20,7 +42,126 @@ export default function PatientAppointments() {
       })
       .catch(() => toast.error('Failed to load data'))
       .finally(() => setLoading(false))
+  }
+
+  useEffect(() => {
+    load()
   }, [])
+
+  const handleClearNotifications = async () => {
+    try {
+      await clearNotifications()
+      toast.info('Notifications cleared')
+      load()
+    } catch (err) {
+      toast.error('Failed to clear')
+    }
+  }
+
+  const handleReviewSubmit = async (doctor_id) => {
+    if (!reviewForm.rating) return toast.error('Please select a rating')
+    try {
+      await addReview({ doctor_id, ...reviewForm })
+      toast.success('Thank you for your review!')
+      setReviewing(null)
+      setReviewForm({ rating: 5, comment: '' })
+    } catch (err) {
+      toast.error('Failed to submit review')
+    }
+  }
+
+  const formatDate = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return dateString;
+    return date.toLocaleString('en-US', {
+      year: 'numeric', month: 'short', day: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    });
+  };
+
+  const generateOPForm = (appt) => {
+    const patientUser = JSON.parse(localStorage.getItem('patientUser') || '{}');
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>OP Form - ${patientUser.name || 'Patient'}</title>
+          <style>
+            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; color: #333; }
+            .header { text-align: center; border-bottom: 2px solid #0ea5e9; padding-bottom: 20px; margin-bottom: 30px; }
+            .hospital-name { font-size: 24px; font-weight: bold; color: #0ea5e9; }
+            .doc-name { font-size: 18px; color: #555; }
+            .title { text-align: center; font-size: 20px; font-weight: bold; margin-bottom: 30px; background: #f0f9ff; padding: 10px; border-radius: 8px;}
+            .details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; }
+            .detail-box { border: 1px solid #e5e7eb; padding: 15px; border-radius: 8px; }
+            .detail-title { font-size: 12px; color: #6b7280; text-transform: uppercase; font-weight: bold; margin-bottom: 5px; }
+            .detail-value { font-size: 16px; font-weight: 500; }
+            .footer { margin-top: 50px; text-align: center; font-size: 12px; color: #9ca3af; }
+            @media print {
+              body { -webkit-print-color-adjust: exact; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="hospital-name">${appt.doctor_hospital || 'OPMD Hospital'}</div>
+            <div class="doc-name">Dr. ${appt.doctor_name || 'Doctor'}</div>
+            <div>${appt.specialization || 'Specialist'}</div>
+          </div>
+          <div class="title">OUTPATIENT (OP) APPOINTMENT SLIP</div>
+          <div class="details-grid">
+            <div class="detail-box">
+              <div class="detail-title">Patient Name</div>
+              <div class="detail-value">${patientUser.name || 'N/A'}</div>
+            </div>
+            <div class="detail-box">
+              <div class="detail-title">Appointment Date & Time</div>
+              <div class="detail-value">${formatDate(appt.scheduled_date)}</div>
+            </div>
+            <div class="detail-box">
+              <div class="detail-title">Contact Number</div>
+              <div class="detail-value">${patientUser.phone || 'N/A'}</div>
+            </div>
+            <div class="detail-box">
+              <div class="detail-title">Payment Status</div>
+              <div class="detail-value" style="color: #10b981; font-weight: bold;">PAID ✅</div>
+            </div>
+          </div>
+          <div class="detail-box" style="margin-bottom: 30px;">
+            <div class="detail-title">Hospital Address</div>
+            <div class="detail-value">${appt.doctor_address || appt.doctor_hospital || 'N/A'}</div>
+          </div>
+          <p style="text-align: center; font-style: italic;">Please bring this slip and arrive 15 minutes before your scheduled time.</p>
+          <div class="footer">
+            Generated by OPMD AI Detection Platform on ${formatDate(new Date())}
+          </div>
+          <script>
+            setTimeout(() => { window.print(); window.close(); }, 500);
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
+  const handlePayment = async (appt) => {
+    try {
+      await confirmPayment(appt.id)
+      toast.success('✅ Payment confirmed! Appointment booked successfully!')
+      // Instantly update UI without spinner flash to close QR
+      setAppointments(prev => prev.map(a => a.id === appt.id ? { ...a, status: 'confirmed' } : a))
+      // Instantly open the OP Form modal
+      setShowOPForm({ ...appt, status: 'confirmed' })
+      // Silently refresh data in background
+      Promise.all([getPatientAppointments(), getNotifications()]).then(([apptRes, notifRes]) => {
+        setAppointments(apptRes.data)
+        setNotifications(notifRes.data)
+      }).catch(() => {})
+    } catch (err) {
+      toast.error('Failed to confirm payment')
+    }
+  }
 
   return (
     <div className="page fade-in">
@@ -58,12 +199,33 @@ export default function PatientAppointments() {
                       <div style={{ color: 'var(--primary)', fontSize: 13, marginBottom: 8 }}>🏥 {appt.doctor_hospital}</div>
                       {appt.specialization && <div className="tag" style={{ marginBottom: 8 }}>{appt.specialization}</div>}
                     </div>
-                    <div className={`status-badge status-${appt.status}`}>{STATUS_LABEL[appt.status] || appt.status}</div>
+                    <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                      <button 
+                        onClick={() => appt.status === 'confirmed' && setShowOPForm(appt)}
+                        className={`btn btn-sm ${appt.status === 'confirmed' ? 'btn-primary' : 'btn-secondary'}`}
+                        disabled={appt.status !== 'confirmed'}
+                        style={{ opacity: appt.status !== 'confirmed' ? 0.5 : 1, cursor: appt.status === 'confirmed' ? 'pointer' : 'not-allowed' }}
+                        title={appt.status !== 'confirmed' ? "Complete payment to unlock OP Form" : "View OP Form"}
+                      >
+                        📄 OP Form
+                      </button>
+                      <div className={`status-badge status-${appt.status}`}>{STATUS_LABEL[appt.status] || appt.status}</div>
+                    </div>
+                  </div>
+                  <div style={{ marginTop: 8 }}>
+                    <a
+                      href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(appt.doctor_address || appt.doctor_hospital || '')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ fontSize: 13, color: 'var(--primary)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                    >
+                      📍 Get Directions on Google Maps
+                    </a>
                   </div>
                   {appt.scheduled_date && (
                     <div className="alert alert-success" style={{ marginTop: 12 }}>
                       <span>📅</span>
-                      <span>Appointment scheduled for: <strong>{new Date(appt.scheduled_date).toLocaleString()}</strong></span>
+                      <span>Appointment scheduled for: <strong>{formatDate(appt.scheduled_date)}</strong></span>
                     </div>
                   )}
                   {appt.notes && (
@@ -72,8 +234,100 @@ export default function PatientAppointments() {
                     </div>
                   )}
                   <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 12 }}>
-                    Requested: {new Date(appt.created_at).toLocaleDateString()}
+                    Requested: {formatDate(appt.created_at)}
                   </div>
+
+                  {/* QR Payment Section - shown when doctor schedules but patient hasn't paid */}
+                  {appt.status === 'scheduled' && (
+                    <div style={{ marginTop: 16, borderTop: '1px solid var(--border)', paddingTop: 16 }}>
+                      <div style={{ background: 'rgba(14,165,233,0.08)', borderRadius: 12, padding: 20, border: '1px solid rgba(14,165,233,0.2)' }}>
+                        <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontSize: 24 }}>💳</span>
+                          <span>Pay to Confirm Appointment</span>
+                        </div>
+                        <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 16 }}>
+                          Your appointment has been scheduled. Scan the QR code below to pay and confirm your slot.
+                        </p>
+                        {appt.doctor_consultation_fee && (
+                          <div style={{ background: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.3)', borderRadius: 8, padding: '10px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <span style={{ fontSize: 20 }}>💰</span>
+                            <div>
+                              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Consultation Fee</div>
+                              <div style={{ fontWeight: 700, fontSize: 20, color: '#fbbf24' }}>₹{appt.doctor_consultation_fee}</div>
+                            </div>
+                          </div>
+                        )}
+                        {appt.doctor_payment_qr ? (
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 16 }}>
+                            <div style={{ textAlign: 'center', background: '#fff', padding: 16, borderRadius: 12, border: '1px solid #e2e8f0' }}>
+                              <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 10, color: '#333' }}>1. Scan & Pay</div>
+                              <img src={appt.doctor_payment_qr.startsWith('data:image') ? appt.doctor_payment_qr : `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`upi://pay?pa=${appt.doctor_payment_qr}&pn=${appt.doctor_name || 'Doctor'}&am=${appt.doctor_consultation_fee || '200'}&cu=INR`)}`} alt="Payment QR Code"
+                                style={{ width: '100%', maxWidth: 180, height: 180, borderRadius: 8, objectFit: 'contain' }} />
+                              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 8 }}>Scan with UPI / GPay</div>
+                            </div>
+                            
+                            <div style={{ textAlign: 'center', background: '#fff', padding: 16, borderRadius: 12, border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                              <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 10, color: '#333' }}>2. Upload Screenshot</div>
+                              {screenshots[appt.id] ? (
+                                <div style={{ position: 'relative' }}>
+                                  <img src={screenshots[appt.id]} alt="Screenshot" style={{ width: '100%', height: 140, objectFit: 'cover', borderRadius: 8, border: '1px solid #e2e8f0' }} />
+                                  <button onClick={() => setScreenshots(prev => ({...prev, [appt.id]: null}))} style={{ position: 'absolute', top: -8, right: -8, background: '#ef4444', color: '#fff', border: 'none', borderRadius: '50%', width: 24, height: 24, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+                                </div>
+                              ) : (
+                                <label style={{ border: '2px dashed #0ea5e9', borderRadius: 8, padding: '20px 10px', cursor: 'pointer', display: 'block', background: '#f0f9ff' }}>
+                                  <div style={{ fontSize: 24, marginBottom: 5 }}>📸</div>
+                                  <div style={{ fontSize: 12, color: '#0ea5e9', fontWeight: 600 }}>Click to Upload</div>
+                                  <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => handleScreenshotUpload(appt.id, e)} />
+                                </label>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="alert alert-warning mb-3"><span>⚠️</span><span>Doctor has not uploaded a payment QR code yet. Please contact them directly.</span></div>
+                        )}
+                        <button onClick={() => handlePayment(appt)} disabled={!screenshots[appt.id]} className={`btn ${screenshots[appt.id] ? 'btn-success' : 'btn-secondary'}`} style={{ width: '100%', fontSize: 15, padding: '12px 0', opacity: screenshots[appt.id] ? 1 : 0.6, cursor: screenshots[appt.id] ? 'pointer' : 'not-allowed' }}>
+                          ✅ I've Paid & Uploaded — Confirm
+                        </button>
+                        <p style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center', marginTop: 8 }}>Only click after completing the payment</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Review Section - shown when confirmed */}
+                  {appt.status === 'confirmed' && (
+                    <div style={{ marginTop: 16, borderTop: '1px solid var(--border)', paddingTop: 16 }}>
+                      <div className="alert alert-success" style={{ marginBottom: 12 }}>
+                        <span>🎉</span><span>Appointment confirmed! See you on <strong>{formatDate(appt.scheduled_date)}</strong></span>
+                      </div>
+                      {reviewing === appt.id ? (
+                        <div className="card" style={{ background: 'rgba(14,165,233,0.06)' }}>
+                          <div style={{ fontWeight: 700, marginBottom: 12 }}>⭐ Rate your experience</div>
+                          <div className="form-group">
+                            <label className="form-label">Rating</label>
+                            <div style={{ display: 'flex', gap: 8, fontSize: 24, marginBottom: 12 }}>
+                              {[1, 2, 3, 4, 5].map(star => (
+                                <span key={star} onClick={() => setReviewForm({ ...reviewForm, rating: star })}
+                                  style={{ cursor: 'pointer', color: star <= reviewForm.rating ? '#fbbf24' : '#4b5563' }}>
+                                  {star <= reviewForm.rating ? '⭐' : '☆'}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="form-group">
+                            <label className="form-label">Comment</label>
+                            <textarea className="form-control" rows={2} placeholder="Write a short review..."
+                              value={reviewForm.comment} onChange={e => setReviewForm({ ...reviewForm, comment: e.target.value })} />
+                          </div>
+                          <div style={{ display: 'flex', gap: 10 }}>
+                            <button onClick={() => handleReviewSubmit(appt.doctor_id)} className="btn btn-primary" style={{ flex: 1 }}>Submit Review</button>
+                            <button onClick={() => setReviewing(null)} className="btn btn-secondary">Cancel</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button onClick={() => setReviewing(appt.id)} className="btn btn-secondary btn-sm">⭐ Rate Doctor</button>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -86,13 +340,16 @@ export default function PatientAppointments() {
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
+                <button onClick={handleClearNotifications} className="btn btn-secondary btn-sm">🗑️ Clear All</button>
+              </div>
               {notifications.map(n => (
                 <div key={n.id} className="card" style={{ background: n.is_read ? 'var(--bg-card)' : 'rgba(14,165,233,0.06)', borderColor: n.is_read ? 'var(--border)' : 'rgba(14,165,233,0.3)' }}>
                   <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
                     <div style={{ fontSize: 24 }}>🔔</div>
                     <div>
                       <div style={{ fontSize: 14, lineHeight: 1.6 }}>{n.message}</div>
-                      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>{new Date(n.created_at).toLocaleString()}</div>
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>{formatDate(n.created_at)}</div>
                     </div>
                     {!n.is_read && <div style={{ width: 8, height: 8, background: 'var(--primary)', borderRadius: '50%', flexShrink: 0, marginTop: 6 }} />}
                   </div>
@@ -102,6 +359,58 @@ export default function PatientAppointments() {
           )
         )}
       </div>
+
+      {showOPForm && (
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div id="op-receipt-modal" className="card fade-in" style={{ width: '100%', maxWidth: 500, background: '#fff', color: '#333', padding: 30, borderRadius: 16, position: 'relative' }}>
+            <button onClick={() => setShowOPForm(null)} style={{ position: 'absolute', top: 16, right: 16, background: 'transparent', border: 'none', fontSize: 24, cursor: 'pointer', color: '#888' }}>×</button>
+            
+            <div style={{ textAlign: 'center', borderBottom: '2px solid var(--primary)', paddingBottom: 16, marginBottom: 20 }}>
+              <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--primary)' }}>{showOPForm.doctor_hospital || 'OPMD Hospital'}</div>
+              <div style={{ fontSize: 18, color: '#555' }}>Dr. {showOPForm.doctor_name}</div>
+              <div style={{ fontSize: 14, color: '#777' }}>{showOPForm.specialization || 'Specialist'}</div>
+            </div>
+            
+            <div style={{ textAlign: 'center', fontSize: 18, fontWeight: 700, marginBottom: 24, background: 'rgba(14,165,233,0.1)', padding: 10, borderRadius: 8, color: 'var(--primary)' }}>
+              OUTPATIENT (OP) RECEIPT
+            </div>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
+              <div style={{ background: '#f9fafb', padding: 14, borderRadius: 8, border: '1px solid #e5e7eb' }}>
+                <div style={{ fontSize: 12, color: '#6b7280', textTransform: 'uppercase', fontWeight: 700 }}>Patient Name</div>
+                <div style={{ fontSize: 16, fontWeight: 600 }}>{JSON.parse(localStorage.getItem('patientUser') || '{}').name || 'N/A'}</div>
+              </div>
+              <div style={{ background: '#f9fafb', padding: 14, borderRadius: 8, border: '1px solid #e5e7eb' }}>
+                <div style={{ fontSize: 12, color: '#6b7280', textTransform: 'uppercase', fontWeight: 700 }}>Date & Time</div>
+                <div style={{ fontSize: 16, fontWeight: 600 }}>{formatDate(showOPForm.scheduled_date)}</div>
+              </div>
+              <div style={{ background: '#f9fafb', padding: 14, borderRadius: 8, border: '1px solid #e5e7eb' }}>
+                <div style={{ fontSize: 12, color: '#6b7280', textTransform: 'uppercase', fontWeight: 700 }}>Payment Status</div>
+                <div style={{ fontSize: 16, fontWeight: 600, color: '#10b981' }}>PAID ✅</div>
+              </div>
+              <div style={{ background: '#f9fafb', padding: 14, borderRadius: 8, border: '1px solid #e5e7eb' }}>
+                <div style={{ fontSize: 12, color: '#6b7280', textTransform: 'uppercase', fontWeight: 700 }}>Hospital Address</div>
+                <div style={{ fontSize: 14, fontWeight: 500 }}>{showOPForm.doctor_address || showOPForm.doctor_hospital || 'N/A'}</div>
+              </div>
+            </div>
+            
+            <div style={{ textAlign: 'center', fontSize: 13, fontStyle: 'italic', color: '#6b7280', marginBottom: 20 }}>
+              Please show this receipt at the reception and arrive 15 minutes early.
+            </div>
+            
+            <button onClick={() => {
+              const printContent = document.getElementById('op-receipt-modal').innerHTML;
+              const originalContent = document.body.innerHTML;
+              document.body.innerHTML = printContent;
+              window.print();
+              document.body.innerHTML = originalContent;
+              window.location.reload();
+            }} className="btn btn-primary" style={{ width: '100%', fontSize: 16, padding: '12px 0' }}>
+              🖨️ Print Receipt
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

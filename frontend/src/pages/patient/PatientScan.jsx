@@ -6,14 +6,13 @@ import PatientNavbar from '../../components/PatientNavbar'
 
 const VIEWS = [
   { key: 'left_image', label: 'Left View', icon: '⬅️', desc: 'Open mouth wide, capture left inner cheek and gum area' },
-  { key: 'front_image', label: 'Front View', icon: '🔵', desc: 'Capture front teeth, gums, and center of the tongue' },
   { key: 'right_image', label: 'Right View', icon: '➡️', desc: 'Open mouth wide, capture right inner cheek and gum area' },
 ]
 
 export default function PatientScan() {
   const navigate = useNavigate()
-  const [images, setImages] = useState({ left_image: null, front_image: null, right_image: null })
-  const [previews, setPreviews] = useState({ left_image: null, front_image: null, right_image: null })
+  const [images, setImages] = useState({ left_image: null, right_image: null })
+  const [previews, setPreviews] = useState({ left_image: null, right_image: null })
   const [loading, setLoading] = useState(false)
   const [dragOver, setDragOver] = useState(null)
   const inputRefs = useRef({})
@@ -42,7 +41,6 @@ export default function PatientScan() {
     try {
       const res = await analyzeScan({
         left_image: images.left_image || '',
-        front_image: images.front_image || '',
         right_image: images.right_image || '',
       })
       sessionStorage.setItem('scanResult', JSON.stringify(res.data))
@@ -120,10 +118,10 @@ export default function PatientScan() {
         {/* Progress */}
         <div className="card mt-3" style={{ textAlign: 'center' }}>
           <div style={{ marginBottom: 12, fontSize: 15, color: 'var(--text-muted)' }}>
-            {uploaded} of 3 images uploaded
+            {uploaded} of 2 images uploaded
           </div>
           <div style={{ height: 8, background: 'rgba(255,255,255,0.08)', borderRadius: 99, overflow: 'hidden', marginBottom: 24 }}>
-            <div style={{ height: '100%', width: `${(uploaded / 3) * 100}%`, background: 'var(--gradient)', borderRadius: 99, transition: 'width 0.4s' }} />
+            <div style={{ height: '100%', width: `${(uploaded / 2) * 100}%`, background: 'var(--gradient)', borderRadius: 99, transition: 'width 0.4s' }} />
           </div>
           <button onClick={handleAnalyze} className="btn btn-primary btn-lg" disabled={loading || uploaded === 0}
             style={{ minWidth: 220 }}>

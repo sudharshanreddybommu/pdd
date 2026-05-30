@@ -16,15 +16,19 @@ import io
 from PIL import Image
 
 app = Flask(__name__)
-CORS(app, origins=["http://localhost:5173"])
+CORS(app, origins="*")
 
 app.config["JWT_SECRET_KEY"] = "opmd-secret-key-2024-secure"
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=24)
 jwt = JWTManager(app)
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "opmd.db")
-UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), "uploads")
+
+# Use /data for persistent storage on Render, local path for development
+DATA_DIR = '/data' if os.path.exists('/data') else os.path.dirname(__file__)
+DB_PATH = os.path.join(DATA_DIR, "opmd.db")
+UPLOAD_FOLDER = os.path.join(DATA_DIR, "uploads")
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
 
 # Email config - update with real SMTP credentials
 EMAIL_HOST = "smtp.gmail.com"
@@ -516,9 +520,10 @@ def update_doctor_profile():
     data = request.get_json()
     conn = get_db()
     conn.execute(
-        "UPDATE doctors SET name=?, phone=?, hospital=?, address=?, specialization=? WHERE id=?",
+        "UPDATE doctors SET name=?, phone=?, hospital=?, address=?, specialization=?, profile_image=?, payment_qr=?, consultation_fee=? WHERE id=?",
         (data.get('name'), data.get('phone'), data.get('hospital'),
-         data.get('address'), data.get('specialization'), identity['id'])
+         data.get('address'), data.get('specialization'), data.get('profile_image'), 
+         data.get('payment_qr'), data.get('consultation_fee'), identity['id'])
     )
     conn.commit()
     doctor = conn.execute("SELECT * FROM doctors WHERE id=?", (identity['id'],)).fetchone()
@@ -593,6 +598,10 @@ def doctor_appointments():
         return jsonify({"error": "Unauthorized"}), 403
 
     conn = get_db()
+    now_str = datetime.now().strftime('%Y-%m-%dT%H:%M')
+    conn.execute("UPDATE appointments SET status='rejected' WHERE status IN ('scheduled', 'confirmed') AND scheduled_date IS NOT NULL AND scheduled_date < ?", (now_str,))
+    conn.commit()
+
     appts = conn.execute("""
         SELECT a.*, p.name as patient_name, p.phone as patient_phone, p.age as patient_age,
                s.prediction, s.risk_level, s.suggestions, s.created_at as scan_date
@@ -607,14 +616,33 @@ def doctor_appointments():
     result = []
     for a in appts:
         d = dict(a)
-        if d.get('suggestions'):
-            try:
-                d['suggestions'] = json.loads(d['suggestions'])
-            except:
-                pass
+        d['suggestions'] = json.loads(d['suggestions']) if d['suggestions'] else []
         result.append(d)
     return jsonify(result), 200
 
+@app.route('/api/doctor/appointment/<int:appt_id>/complete', methods=['PUT'])
+@jwt_required()
+def complete_appointment(appt_id):
+    identity = json.loads(get_jwt_identity())
+    if identity['type'] != 'doctor':
+        return jsonify({"error": "Unauthorized"}), 403
+
+    conn = get_db()
+    appt = conn.execute("SELECT * FROM appointments WHERE id=? AND doctor_id=?", (appt_id, identity['id'])).fetchone()
+    if not appt:
+        conn.close()
+        return jsonify({"error": "Appointment not found"}), 404
+
+    conn.execute("UPDATE appointments SET status='completed' WHERE id=?", (appt_id,))
+    
+    doctor = conn.execute("SELECT name FROM doctors WHERE id=?", (identity['id'],)).fetchone()
+    conn.execute(
+        "INSERT INTO notifications (user_id, user_type, message) VALUES (?, 'patient', ?)",
+        (appt['patient_id'], f"Your appointment with Dr. {doctor['name'] or 'Unknown'} has been marked as completed. Thank you for visiting!")
+    )
+    conn.commit()
+    conn.close()
+    return jsonify({"message": "Appointment completed"}), 200
 
 @app.route('/api/doctor/appointment/<int:appt_id>/schedule', methods=['PUT'])
 @jwt_required()
@@ -715,4 +743,4 @@ def admin_list_doctors():
 
 if __name__ == '__main__':
     init_db()
-    app.run(debug=True, port=5000)
+    app.run(host='0.0.0.0', debug=True, port=5000)

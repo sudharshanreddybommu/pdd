@@ -1,0 +1,56 @@
+{
+  "expo": {
+    "name": "FinalPDD",
+    "slug": "final-pdd",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow FinalPDD to access your camera to scan QR codes."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow FinalPDD to access your photos to upload payment proof."
+        }
+      ]
+    ],
+    "ios": {
+      "bundleIdentifier": "com.sudha.finalpdd",
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.sudha.finalpdd",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#FFFFFF"
+      },
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.INTERNET"
+      ]
+    },
+    "extra": {
+      "eas": {
+        "projectId": "ad2eeade-6f8b-444c-81eb-3cd3eb1d9f93"
+      }
+    }
+  }
+}
+

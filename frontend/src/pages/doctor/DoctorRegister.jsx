@@ -4,6 +4,7 @@ import { toast } from 'react-toastify'
 import { sendOtp, verifyOtp, doctorRegister } from '../../services/api'
 
 const DOC_TYPES = [
+  { key: 'profile_image', label: 'Professional Profile Photo', icon: '👤', required: true },
   { key: 'hospital_id_doc', label: 'Hospital ID Card', icon: '🏥', required: true },
   { key: 'medical_cert_doc', label: 'Medical Certificate', icon: '📜', required: false },
   { key: 'degree_cert_doc', label: 'Degree Certificate', icon: '🎓', required: false },
@@ -14,8 +15,11 @@ export default function DoctorRegister() {
   const [step, setStep] = useState(0)
   const [email, setEmail] = useState('')
   const [otp, setOtp] = useState(['', '', '', '', '', ''])
-  const [docs, setDocs] = useState({ hospital_id_doc: null, medical_cert_doc: null, degree_cert_doc: null })
+  const [docs, setDocs] = useState({ profile_image: null, hospital_id_doc: null, medical_cert_doc: null, degree_cert_doc: null, payment_qr: null })
   const [docNames, setDocNames] = useState({})
+  const [password, setPassword] = useState('')
+  const [confirm, setConfirm] = useState('')
+  const [fee, setFee] = useState('')
   const [loading, setLoading] = useState(false)
   const [devOtp, setDevOtp] = useState('')
   const [submitted, setSubmitted] = useState(false)
@@ -74,10 +78,14 @@ export default function DoctorRegister() {
 
   const handleDocSubmit = async e => {
     e.preventDefault()
+    if (!docs.profile_image) return toast.error('Profile Photo is required')
     if (!docs.hospital_id_doc) return toast.error('Hospital ID Card is required')
+    if (!password) return toast.error('Please set a password')
+    if (password !== confirm) return toast.error('Passwords do not match')
+    if (password.length < 6) return toast.error('Password must be at least 6 characters')
     setLoading(true)
     try {
-      await doctorRegister({ email, ...docs })
+      await doctorRegister({ email, password, consultation_fee: fee, ...docs })
       setSubmitted(true)
     } catch (err) {
       toast.error(err.response?.data?.error || 'Registration failed')
@@ -90,11 +98,11 @@ export default function DoctorRegister() {
     <div className="page flex-center" style={{ minHeight: '100vh' }}>
       <div className="auth-card" style={{ maxWidth: 500, textAlign: 'center' }}>
         <div style={{ fontSize: 72, marginBottom: 20 }}>🎉</div>
-        <h2 style={{ fontSize: 24, fontWeight: 700, marginBottom: 12 }}>Documents Submitted!</h2>
+        <h2 style={{ fontSize: 24, fontWeight: 700, marginBottom: 12 }}>Registration Successful!</h2>
         <p className="text-muted mb-3" style={{ lineHeight: 1.7 }}>
-          Your registration is under review. Our admin team will verify your documents within <strong>24-48 hours</strong>. You'll receive an email once approved.
+          Your account has been **auto-verified** for development. You can now set your password and access your dashboard.
         </p>
-        <div className="alert alert-info mb-3"><span>📧</span><span>Check your email at <strong>{email}</strong> for verification updates</span></div>
+        <div className="alert alert-success mb-3"><span>✅</span><span>Your account is ready for <strong>Login</strong></span></div>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
           <button onClick={() => navigate('/doctor/login')} className="btn btn-primary">Go to Login</button>
           <button onClick={() => navigate('/doctor')} className="btn btn-secondary">Back to Home</button>
@@ -191,6 +199,32 @@ export default function DoctorRegister() {
                     onChange={e => handleFileUpload(dt.key, e.target.files[0])} />
                 </div>
               ))}
+              
+              <div className="form-group mt-2">
+                <label className="form-label">Create Password *</label>
+                <input className="form-control" type="password" placeholder="••••••••"
+                  value={password} onChange={e => setPassword(e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Confirm Password *</label>
+                <input className="form-control" type="password" placeholder="••••••••"
+                  value={confirm} onChange={e => setConfirm(e.target.value)} />
+              </div>
+
+              <div className="form-group mt-2">
+                <label className="form-label">💰 Consultation Fee (₹)</label>
+                <input className="form-control" type="number" placeholder="e.g. 200"
+                  value={fee} onChange={e => setFee(e.target.value)} />
+                <small style={{ color: 'var(--text-muted)', fontSize: 12 }}>Shown to patients to pay via QR.</small>
+              </div>
+
+              <div className="form-group mt-2">
+                <label className="form-label">📱 UPI ID (for dynamic QR payments)</label>
+                <input className="form-control" type="text" placeholder="e.g. 9876543210@ybl"
+                  value={docs.payment_qr || ''} onChange={e => setDocs({ ...docs, payment_qr: e.target.value })} />
+                <small style={{ color: 'var(--text-muted)', fontSize: 12 }}>We will generate a QR code for your patients using this UPI ID and Fee.</small>
+              </div>
+
               <div className="alert alert-info mb-3"><span>ℹ️</span><span>Accepted: Images (JPG, PNG) and PDF files</span></div>
               <button className="btn btn-primary btn-block btn-lg" disabled={loading}>
                 {loading ? <div className="spinner" /> : '📤 Submit for Verification'}
