@@ -1,6 +1,8 @@
 import { useNavigate, Link, useLocation } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { getNotifications, markNotificationsRead } from '../services/api'
+import ThemeSelector from './ThemeSelector'
+import LanguageSelector from './LanguageSelector'
 
 export default function PatientNavbar() {
   const navigate = useNavigate()
@@ -46,6 +48,8 @@ export default function PatientNavbar() {
           Appointments {unread > 0 && <span className="nav-badge">{unread}</span>}
         </Link>
         <Link to="/patient/profile" className={isActive('/patient/profile')}>Profile</Link>
+        <ThemeSelector />
+        <LanguageSelector />
         <button onClick={logout} className="btn btn-secondary btn-sm nav-btn-mobile">Logout</button>
       </div>
     </nav>

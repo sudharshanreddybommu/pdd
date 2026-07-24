@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "OralScan AI",
-    "slug": "oralscan-ai",
+    "slug": "final-pdd",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -43,14 +43,15 @@
         "android.permission.CAMERA",
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",
-        "android.permission.INTERNET"
+        "android.permission.INTERNET",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "extra": {
       "eas": {
         "projectId": "ad2eeade-6f8b-444c-81eb-3cd3eb1d9f93"
       }
-    }
+    },
+    "owner": "sudharshanreddybommu07"
   }
 }
-

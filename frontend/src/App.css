@@ -357,3 +357,188 @@ body {
   .btn-lg { padding: 14px 24px; font-size: 15px; }
   .otp-input { width: 42px; height: 46px; font-size: 18px; }
 }
+
+/* ── THEME CUSTOMIZATIONS ── */
+body, .page, .navbar, .card, .stat-card, .appt-card, .doctor-card, .form-control, .suggestion-item, .alert, .btn, .step-dot, .navbar-nav {
+  transition: background 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease, transform 0.2s ease;
+}
+
+body[data-theme='emerald'] {
+  --bg-dark: #051411;
+  --bg-card: #0a241f;
+  --bg-card2: #0f332c;
+  --primary: #10b981;
+  --primary-dark: #059669;
+  --primary-light: #a7f3d0;
+  --secondary: #14b8a6;
+  --text: #f0fdf4;
+  --text-muted: #86efac;
+  --border: rgba(16,185,129,0.15);
+  --gradient: linear-gradient(135deg, #10b981 0%, #14b8a6 100%);
+  --social-bg: rgba(16,185,129,0.1);
+  --glass: rgba(255,255,255,0.02);
+  --glass-border: rgba(16,185,129,0.2);
+}
+
+body[data-theme='light'] {
+  --bg-dark: #f8fafc;
+  --bg-card: #ffffff;
+  --bg-card2: #f1f5f9;
+  --primary: #2563eb;
+  --primary-dark: #1d4ed8;
+  --primary-light: #dbeafe;
+  --secondary: #4f46e5;
+  --text: #0f172a;
+  --text-muted: #64748b;
+  --border: rgba(15,23,42,0.08);
+  --glass: rgba(15,23,42,0.02);
+  --glass-border: rgba(15,23,42,0.06);
+  --shadow: 0 10px 15px -3px rgba(0,0,0,0.05), 0 4px 6px -2px rgba(0,0,0,0.02);
+  --gradient: linear-gradient(135deg, #2563eb 0%, #4f46e5 100%);
+}
+
+body[data-theme='light'] .navbar {
+  background: rgba(255, 255, 255, 0.9);
+}
+
+body[data-theme='light'] .navbar-nav {
+  background: rgba(255, 255, 255, 0.98);
+}
+
+body[data-theme='light'] .form-control {
+  color: #0f172a;
+  background: rgba(15,23,42,0.03);
+}
+
+body[data-theme='light'] .otp-input {
+  color: #0f172a;
+  background: rgba(15,23,42,0.03);
+}
+
+body[data-theme='light'] .btn-secondary {
+  color: #334155;
+  background: rgba(0,0,0,0.05);
+}
+
+body[data-theme='cyberpunk'] {
+  --bg-dark: #120917;
+  --bg-card: #211029;
+  --bg-card2: #2b1736;
+  --primary: #d946ef;
+  --primary-dark: #c084fc;
+  --primary-light: #f5d0fe;
+  --secondary: #a855f7;
+  --text: #fae8ff;
+  --text-muted: #d8b4fe;
+  --border: rgba(217,70,239,0.15);
+  --gradient: linear-gradient(135deg, #d946ef 0%, #a855f7 100%);
+  --social-bg: rgba(217,70,239,0.1);
+  --glass: rgba(255,255,255,0.02);
+  --glass-border: rgba(217,70,239,0.2);
+}
+
+/* ── THEME SELECTOR DROPDOWN ── */
+.theme-selector-container {
+  position: relative;
+  display: inline-block;
+}
+.theme-selector-btn {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  color: var(--text);
+  padding: 8px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  outline: none;
+  font-family: 'Inter', sans-serif;
+  transition: all 0.2s;
+}
+.theme-selector-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--primary);
+}
+body[data-theme='light'] .theme-selector-btn:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+.theme-icon {
+  font-size: 15px;
+  line-height: 1;
+}
+.theme-arrow {
+  font-size: 9px;
+  opacity: 0.7;
+}
+.theme-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow);
+  padding: 8px;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 170px;
+  z-index: 1000;
+  animation: fadeIn 0.2s ease;
+}
+.theme-dropdown-item {
+  width: 100%;
+  padding: 10px 12px;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+  font-family: 'Inter', sans-serif;
+  text-align: left;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  transition: all 0.15s;
+}
+.theme-dropdown-item:hover {
+  background: var(--glass);
+  color: var(--text);
+}
+body[data-theme='light'] .theme-dropdown-item:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+.theme-dropdown-item.active {
+  background: var(--primary-light);
+  color: var(--primary-dark);
+}
+.theme-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+@media (max-width: 768px) {
+  .theme-selector-container {
+    width: 100%;
+  }
+  .theme-selector-btn {
+    width: 100%;
+    justify-content: center;
+  }
+  .theme-dropdown-menu {
+    position: static;
+    width: 100%;
+    margin-top: 8px;
+  }
+}
+
+

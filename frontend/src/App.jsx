@@ -4,6 +4,7 @@ import 'react-toastify/dist/ReactToastify.css'
 
 // Patient Pages
 import PatientLogin from './pages/patient/PatientLogin'
+import PatientRegister from './pages/patient/PatientRegister'
 import PatientHome from './pages/patient/PatientHome'
 import PatientProfile from './pages/patient/PatientProfile'
 import PatientScan from './pages/patient/PatientScan'
@@ -20,6 +21,8 @@ import DoctorProfile from './pages/doctor/DoctorProfile'
 
 import './App.css'
 
+import { useEffect } from 'react'
+
 const PatientPrivateRoute = ({ children }) => {
   const token = localStorage.getItem('patientToken')
   return token ? children : <Navigate to="/patient/login" replace />
@@ -31,6 +34,15 @@ const DoctorPrivateRoute = ({ children }) => {
 }
 
 function App() {
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme') || 'classic'
+    if (savedTheme === 'classic') {
+      document.body.removeAttribute('data-theme')
+    } else {
+      document.body.setAttribute('data-theme', savedTheme)
+    }
+  }, [])
+
   return (
     <Router>
       <ToastContainer position="top-right" autoClose={3000} theme="dark" />
@@ -40,6 +52,7 @@ function App() {
 
         {/* Patient Routes */}
         <Route path="/patient/login" element={<PatientLogin />} />
+        <Route path="/patient/register" element={<PatientRegister />} />
         <Route path="/patient/home" element={<PatientPrivateRoute><PatientHome /></PatientPrivateRoute>} />
         <Route path="/patient/profile" element={<PatientPrivateRoute><PatientProfile /></PatientPrivateRoute>} />
         <Route path="/patient/scan" element={<PatientPrivateRoute><PatientScan /></PatientPrivateRoute>} />

@@ -6,6 +6,7 @@ import PatientNavbar from '../../components/PatientNavbar'
 const STATUS_LABEL = {
   pending: '⏳ Pending',
   scheduled: '💳 Payment Pending',
+  payment_pending: '🔍 Verifying Payment',
   confirmed: '✅ Confirmed',
   completed: '🎉 Completed',
   rejected: '❌ Declined'
@@ -45,7 +46,7 @@ export default function PatientAppointments() {
   }
 
   useEffect(() => {
-    load()
+    setTimeout(() => { load() }, 0);
   }, [])
 
   const handleClearNotifications = async () => {
@@ -53,7 +54,7 @@ export default function PatientAppointments() {
       await clearNotifications()
       toast.info('Notifications cleared')
       load()
-    } catch (err) {
+    } catch {
       toast.error('Failed to clear')
     }
   }
@@ -65,101 +66,44 @@ export default function PatientAppointments() {
       toast.success('Thank you for your review!')
       setReviewing(null)
       setReviewForm({ rating: 5, comment: '' })
-    } catch (err) {
+    } catch {
       toast.error('Failed to submit review')
     }
   }
 
   const formatDate = (dateString) => {
     if (!dateString) return '';
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) return dateString;
-    return date.toLocaleString('en-US', {
+    // SQLite CURRENT_TIMESTAMP returns UTC without 'Z' suffix.
+    // Append 'Z' so the browser correctly interprets it as UTC and
+    // converts to the user's local timezone.
+    const normalized = typeof dateString === 'string' && !dateString.endsWith('Z') && !dateString.includes('+') && !dateString.includes('T')
+      ? dateString.replace(' ', 'T') + 'Z'
+      : dateString;
+    const date = new Date(normalized);
+    if (isNaN(date.getTime())) return String(dateString);
+    return date.toLocaleString('en-IN', {
       year: 'numeric', month: 'short', day: 'numeric',
-      hour: '2-digit', minute: '2-digit'
+      hour: '2-digit', minute: '2-digit', hour12: true
     });
   };
 
-  const generateOPForm = (appt) => {
-    const patientUser = JSON.parse(localStorage.getItem('patientUser') || '{}');
-    const printWindow = window.open('', '_blank');
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>OP Form - ${patientUser.name || 'Patient'}</title>
-          <style>
-            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; color: #333; }
-            .header { text-align: center; border-bottom: 2px solid #0ea5e9; padding-bottom: 20px; margin-bottom: 30px; }
-            .hospital-name { font-size: 24px; font-weight: bold; color: #0ea5e9; }
-            .doc-name { font-size: 18px; color: #555; }
-            .title { text-align: center; font-size: 20px; font-weight: bold; margin-bottom: 30px; background: #f0f9ff; padding: 10px; border-radius: 8px;}
-            .details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; }
-            .detail-box { border: 1px solid #e5e7eb; padding: 15px; border-radius: 8px; }
-            .detail-title { font-size: 12px; color: #6b7280; text-transform: uppercase; font-weight: bold; margin-bottom: 5px; }
-            .detail-value { font-size: 16px; font-weight: 500; }
-            .footer { margin-top: 50px; text-align: center; font-size: 12px; color: #9ca3af; }
-            @media print {
-              body { -webkit-print-color-adjust: exact; }
-            }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <div class="hospital-name">${appt.doctor_hospital || 'OPMD Hospital'}</div>
-            <div class="doc-name">Dr. ${appt.doctor_name || 'Doctor'}</div>
-            <div>${appt.specialization || 'Specialist'}</div>
-          </div>
-          <div class="title">OUTPATIENT (OP) APPOINTMENT SLIP</div>
-          <div class="details-grid">
-            <div class="detail-box">
-              <div class="detail-title">Patient Name</div>
-              <div class="detail-value">${patientUser.name || 'N/A'}</div>
-            </div>
-            <div class="detail-box">
-              <div class="detail-title">Appointment Date & Time</div>
-              <div class="detail-value">${formatDate(appt.scheduled_date)}</div>
-            </div>
-            <div class="detail-box">
-              <div class="detail-title">Contact Number</div>
-              <div class="detail-value">${patientUser.phone || 'N/A'}</div>
-            </div>
-            <div class="detail-box">
-              <div class="detail-title">Payment Status</div>
-              <div class="detail-value" style="color: #10b981; font-weight: bold;">PAID ✅</div>
-            </div>
-          </div>
-          <div class="detail-box" style="margin-bottom: 30px;">
-            <div class="detail-title">Hospital Address</div>
-            <div class="detail-value">${appt.doctor_address || appt.doctor_hospital || 'N/A'}</div>
-          </div>
-          <p style="text-align: center; font-style: italic;">Please bring this slip and arrive 15 minutes before your scheduled time.</p>
-          <div class="footer">
-            Generated by OPMD AI Detection Platform on ${formatDate(new Date())}
-          </div>
-          <script>
-            setTimeout(() => { window.print(); window.close(); }, 500);
-          </script>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
-  };
-
   const handlePayment = async (appt) => {
+    const screenshot = screenshots[appt.id]
+    if (!screenshot) return toast.error('Please upload a payment screenshot first')
     try {
-      await confirmPayment(appt.id)
-      toast.success('✅ Payment confirmed! Appointment booked successfully!')
-      // Instantly update UI without spinner flash to close QR
-      setAppointments(prev => prev.map(a => a.id === appt.id ? { ...a, status: 'confirmed' } : a))
-      // Instantly open the OP Form modal
-      setShowOPForm({ ...appt, status: 'confirmed' })
-      // Silently refresh data in background
+      await confirmPayment(appt.id, screenshot)
+      toast.success('📤 Screenshot submitted! Waiting for doctor to verify your payment.')
+      // Update status to payment_pending instantly
+      setAppointments(prev => prev.map(a => a.id === appt.id ? { ...a, status: 'payment_pending' } : a))
+      // Clear screenshot
+      setScreenshots(prev => ({ ...prev, [appt.id]: null }))
+      // Refresh in background
       Promise.all([getPatientAppointments(), getNotifications()]).then(([apptRes, notifRes]) => {
         setAppointments(apptRes.data)
         setNotifications(notifRes.data)
       }).catch(() => {})
     } catch (err) {
-      toast.error('Failed to confirm payment')
+      toast.error(err.response?.data?.error || 'Failed to submit screenshot')
     }
   }
 
@@ -205,7 +149,7 @@ export default function PatientAppointments() {
                         className={`btn btn-sm ${appt.status === 'confirmed' ? 'btn-primary' : 'btn-secondary'}`}
                         disabled={appt.status !== 'confirmed'}
                         style={{ opacity: appt.status !== 'confirmed' ? 0.5 : 1, cursor: appt.status === 'confirmed' ? 'pointer' : 'not-allowed' }}
-                        title={appt.status !== 'confirmed' ? "Complete payment to unlock OP Form" : "View OP Form"}
+                        title={appt.status !== 'confirmed' ? 'OP Form unlocks after doctor verifies your payment' : 'View OP Form'}
                       >
                         📄 OP Form
                       </button>
@@ -283,12 +227,43 @@ export default function PatientAppointments() {
                             </div>
                           </div>
                         ) : (
-                          <div className="alert alert-warning mb-3"><span>⚠️</span><span>Doctor has not uploaded a payment QR code yet. Please contact them directly.</span></div>
+                          <div style={{ marginBottom: 16 }}>
+                            <div className="alert alert-warning mb-3"><span>⚠️</span><span>Doctor has not set a payment QR yet. Please upload your payment screenshot after paying via any method.</span></div>
+                            <div style={{ textAlign: 'center', background: '#fff', padding: 16, borderRadius: 12, border: '1px solid #e2e8f0' }}>
+                              <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 10, color: '#333' }}>Upload Payment Screenshot</div>
+                              {screenshots[appt.id] ? (
+                                <div style={{ position: 'relative' }}>
+                                  <img src={screenshots[appt.id]} alt="Screenshot" style={{ width: '100%', height: 140, objectFit: 'cover', borderRadius: 8, border: '1px solid #e2e8f0' }} />
+                                  <button onClick={() => setScreenshots(prev => ({...prev, [appt.id]: null}))} style={{ position: 'absolute', top: -8, right: -8, background: '#ef4444', color: '#fff', border: 'none', borderRadius: '50%', width: 24, height: 24, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+                                </div>
+                              ) : (
+                                <label style={{ border: '2px dashed #0ea5e9', borderRadius: 8, padding: '20px 10px', cursor: 'pointer', display: 'block', background: '#f0f9ff' }}>
+                                  <div style={{ fontSize: 24, marginBottom: 5 }}>📸</div>
+                                  <div style={{ fontSize: 12, color: '#0ea5e9', fontWeight: 600 }}>Click to Upload</div>
+                                  <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => handleScreenshotUpload(appt.id, e)} />
+                                </label>
+                              )}
+                            </div>
+                          </div>
                         )}
                         <button onClick={() => handlePayment(appt)} disabled={!screenshots[appt.id]} className={`btn ${screenshots[appt.id] ? 'btn-success' : 'btn-secondary'}`} style={{ width: '100%', fontSize: 15, padding: '12px 0', opacity: screenshots[appt.id] ? 1 : 0.6, cursor: screenshots[appt.id] ? 'pointer' : 'not-allowed' }}>
-                          ✅ I've Paid & Uploaded — Confirm
+                          📤 Submit Screenshot for Verification
                         </button>
-                        <p style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center', marginTop: 8 }}>Only click after completing the payment</p>
+                        <p style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center', marginTop: 8 }}>Doctor will verify your screenshot and confirm your appointment</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Payment Pending Verification - shown after patient submits screenshot */}
+                  {appt.status === 'payment_pending' && (
+                    <div style={{ marginTop: 16, borderTop: '1px solid var(--border)', paddingTop: 16 }}>
+                      <div style={{ background: 'rgba(251,191,36,0.08)', borderRadius: 12, padding: 20, border: '1px solid rgba(251,191,36,0.3)', textAlign: 'center' }}>
+                        <div style={{ fontSize: 40, marginBottom: 12 }}>🔍</div>
+                        <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 8, color: '#d97706' }}>Payment Screenshot Under Review</div>
+                        <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 0 }}>
+                          Your payment screenshot has been submitted. The doctor will verify it shortly.
+                          You'll receive a notification once it's accepted or if you need to re-upload.
+                        </p>
                       </div>
                     </div>
                   )}

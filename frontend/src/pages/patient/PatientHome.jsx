@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import PatientNavbar from '../../components/PatientNavbar'
+import OralCareChatbot from '../../components/OralCareChatbot'
 
 const AWARENESS = [
   { icon: '🔬', title: 'What are OPMDs?', text: 'Oral Potentially Malignant Disorders are lesions or conditions of the oral mucosa that carry a risk of malignant transformation. Early detection is key to preventing oral cancer.' },
@@ -88,6 +89,7 @@ export default function PatientHome() {
           © 2024 OPMD AI Detection Platform · For educational and screening purposes only · Always consult a licensed medical professional
         </div>
       </div>
+      <OralCareChatbot />
     </div>
   )
 }

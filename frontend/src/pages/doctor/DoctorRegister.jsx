@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { toast } from 'react-toastify'
 import { sendOtp, verifyOtp, doctorRegister } from '../../services/api'
@@ -22,9 +22,17 @@ export default function DoctorRegister() {
   const [fee, setFee] = useState('')
   const [loading, setLoading] = useState(false)
   const [devOtp, setDevOtp] = useState('')
+  const [resendTimer, setResendTimer] = useState(0)
   const [submitted, setSubmitted] = useState(false)
   const otpRefs = useRef([])
   const fileRefs = useRef({})
+
+  useEffect(() => {
+    if (resendTimer > 0) {
+      const timer = setInterval(() => setResendTimer(t => t - 1), 1000)
+      return () => clearInterval(timer)
+    }
+  }, [resendTimer])
 
   const handleFileUpload = (key, file) => {
     if (!file) return
@@ -58,6 +66,23 @@ export default function DoctorRegister() {
   }
   const handleOtpKey = (e, idx) => {
     if (e.key === 'Backspace' && !otp[idx] && idx > 0) otpRefs.current[idx - 1]?.focus()
+  }
+
+  const handleResendOtp = async () => {
+    if (!email) return toast.error('Email address is missing')
+    setLoading(true)
+    try {
+      const res = await sendOtp(email, 'doctor')
+      if (res.data.dev_otp) setDevOtp(res.data.dev_otp)
+      setOtp(['', '', '', '', '', ''])
+      toast.success('New OTP code sent to your email!')
+      setResendTimer(30)
+      setTimeout(() => otpRefs.current[0]?.focus(), 100)
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to resend OTP')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleOtpSubmit = async e => {
@@ -178,6 +203,18 @@ export default function DoctorRegister() {
               <button className="btn btn-primary btn-block btn-lg" disabled={loading}>
                 {loading ? <div className="spinner" /> : 'Verify OTP'}
               </button>
+              <p className="text-center mt-2" style={{ fontSize: 13 }}>
+                <span className="text-muted">Didn't receive code? </span>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  disabled={loading || resendTimer > 0}
+                  onClick={handleResendOtp}
+                  style={{ fontWeight: 600 }}
+                >
+                  {resendTimer > 0 ? `Resend in ${resendTimer}s` : '🔄 Resend OTP'}
+                </button>
+              </p>
             </form>
           )}
 
