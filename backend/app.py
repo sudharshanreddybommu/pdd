@@ -16,7 +16,7 @@ import io
 from PIL import Image
 
 app = Flask(__name__)
-CORS(app, origins="*")
+CORS(app, resources={r"/*": {"origins": "*"}}, allow_headers="*", methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
 
 app.config["JWT_SECRET_KEY"] = "opmd-secret-key-2024-secure"
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=24)
