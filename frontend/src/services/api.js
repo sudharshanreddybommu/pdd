@@ -1,7 +1,8 @@
 import axios from 'axios'
 
-// Use VITE_API_URL from environment variables if available, otherwise fallback to local development server
-const API_URL = import.meta.env.VITE_API_URL || '/api'
+// Auto-resolve API URL based on environment (mobile app uses live Render server)
+const isLocalDev = window.location.hostname === 'localhost' && (window.location.port === '5173' || window.location.port === '3000' || window.location.port === '5174');
+const API_URL = isLocalDev ? 'http://localhost:5000' : 'https://oralscan-backend-gmup.onrender.com';
 const API = axios.create({ baseURL: API_URL })
 
 API.interceptors.request.use(config => {
