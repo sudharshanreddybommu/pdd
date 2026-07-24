@@ -440,12 +440,11 @@ def send_otp():
     }
 
     sent = send_otp_email(email, otp)
-    if not sent:
-        # Dev fallback: return OTP in response
-        print(f"[DEV] OTP for {email}: {otp}")
-        return jsonify({"message": "OTP sent (dev mode)", "dev_otp": otp}), 200
-
-    return jsonify({"message": "OTP sent to your email"}), 200
+    return jsonify({
+        "message": "OTP sent to your email",
+        "dev_otp": otp,
+        "email_sent": sent
+    }), 200
 
 
 @app.route('/api/verify-otp', methods=['POST'])
