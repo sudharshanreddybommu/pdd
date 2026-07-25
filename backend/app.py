@@ -185,11 +185,19 @@ def send_otp_email(to_email, otp):
         """
 
         msg.attach(MIMEText(body, 'html'))
-        server = smtplib.SMTP(EMAIL_HOST, EMAIL_PORT, timeout=8)
-        server.starttls()
-        server.login(EMAIL_USER, EMAIL_PASS)
-        server.sendmail(EMAIL_USER, to_email, msg.as_string())
-        server.quit()
+        # Try TLS port 587 first, fallback to SSL port 465 if needed
+        try:
+            server = smtplib.SMTP(EMAIL_HOST, 587, timeout=15)
+            server.starttls()
+            server.login(EMAIL_USER, EMAIL_PASS)
+            server.sendmail(EMAIL_USER, to_email, msg.as_string())
+            server.quit()
+        except Exception:
+            server = smtplib.SMTP_SSL(EMAIL_HOST, 465, timeout=15)
+            server.login(EMAIL_USER, EMAIL_PASS)
+            server.sendmail(EMAIL_USER, to_email, msg.as_string())
+            server.quit()
+
         print(f"[EMAIL] OTP sent successfully to {to_email}")
         return True
     except Exception as e:
