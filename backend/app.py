@@ -1054,10 +1054,16 @@ def get_doctor_me():
 def list_doctors():
     conn = get_db()
     doctors = conn.execute(
-        "SELECT id, name, hospital, address, specialization, phone FROM doctors WHERE is_verified=1 AND name IS NOT NULL"
+        "SELECT id, email, name, hospital, address, specialization, phone FROM doctors WHERE is_verified=1"
     ).fetchall()
     conn.close()
-    return jsonify([dict(d) for d in doctors]), 200
+    result = []
+    for d in doctors:
+        doc_dict = dict(d)
+        if not doc_dict.get('name'):
+            doc_dict['name'] = doc_dict['email'].split('@')[0].title()
+        result.append(doc_dict)
+    return jsonify(result), 200
 
 
 # ─── APPOINTMENTS ─────────────────────────────────────────────────────────────

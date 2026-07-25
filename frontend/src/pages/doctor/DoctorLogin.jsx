@@ -150,7 +150,7 @@ export default function DoctorLogin() {
             ))}
           </div>
 
-          {devOtp && <div className="alert alert-warning mb-2"><span>⚠️</span> Dev OTP: <strong>{devOtp}</strong></div>}
+
 
           {step === 0 && (
             <form onSubmit={handleEmailSubmit}>

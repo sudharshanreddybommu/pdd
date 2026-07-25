@@ -99,11 +99,11 @@ export default function PatientLogin() {
     toast.info('Testing connection to Render server...')
     try {
       const start = Date.now()
-      const res = await fetch('https://oralscan-backend-gmup.onrender.com/api/notifications', { method: 'GET', mode: 'cors' })
+      const res = await fetch('https://oralscan-live-api.onrender.com/api/notifications', { method: 'GET', mode: 'cors' })
       const duration = Date.now() - start
       alert(`✅ Connected successfully!\n\nServer is alive.\nDuration: ${duration}ms\nStatus: ${res.status}`)
     } catch (err) {
-      alert(`⚠️ Connection Failed!\n\nError Message: ${err.message}\n\nVerify that the phone has internet access and can reach: https://oralscan-backend-gmup.onrender.com`)
+      alert(`⚠️ Connection Failed!\n\nError Message: ${err.message}\n\nVerify that the phone has internet access and can reach: https://oralscan-live-api.onrender.com`)
     }
   }
 
@@ -241,11 +241,7 @@ export default function PatientLogin() {
             <span style={{ fontWeight: 700, fontSize: 18 }}>Patient Sign In</span>
           </div>
 
-          {devOtp && (
-            <div className="alert alert-warning mb-2">
-              <span>⚠️</span> Dev mode OTP: <strong>{devOtp}</strong>
-            </div>
-          )}
+
 
           {/* Login Form */}
           {step === 0 && (

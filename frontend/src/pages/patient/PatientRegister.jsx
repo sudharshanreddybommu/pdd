@@ -230,11 +230,7 @@ export default function PatientRegister() {
             ))}
           </div>
 
-          {devOtp && (
-            <div className="alert alert-warning mb-2">
-              <span>⚠️</span> Dev mode OTP: <strong>{devOtp}</strong>
-            </div>
-          )}
+
 
           {/* Step 0: Enter Email */}
           {step === 0 && (
