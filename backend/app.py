@@ -34,7 +34,7 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 EMAIL_HOST = "smtp.gmail.com"
 EMAIL_PORT = 587
 EMAIL_USER = "sudharshanreddybommu2@gmail.com"
-EMAIL_PASS = "yugq elhc azrr voik"
+EMAIL_PASS = "uodd wxjf seaq shyb"
 
 # In-memory OTP store: {email: {otp, expires}}
 otp_store = {}
