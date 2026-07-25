@@ -62,12 +62,8 @@ export default function PatientRegister() {
         navigate('/patient/login')
         return
       }
-      const res = await sendOtp(email.trim(), 'patient')
-      if (res.data.dev_otp) {
-        toast.warn(`Email server delayed. Your OTP code is: ${res.data.dev_otp}`, { autoClose: 10000 })
-      } else {
-        toast.success('OTP sent to your email address!')
-      }
+      await sendOtp(email.trim(), 'patient')
+      toast.success('OTP sent to your email address! Please check your inbox and spam folder.')
       setStep(1)
     } catch (err) {
       console.error('Registration Error:', err)

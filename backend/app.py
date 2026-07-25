@@ -447,14 +447,9 @@ def send_otp():
 
     sent = send_otp_email(email, otp)
     if not sent:
-        print(f"[OTP FALLBACK] Email failed. OTP for {email}: {otp}")
-        return jsonify({
-            "message": f"Email server timed out. Use OTP code: {otp}",
-            "dev_otp": otp,
-            "email_sent": False
-        }), 200
+        return jsonify({"error": "Unable to connect to Gmail server to send OTP. Please check your internet connection or email spelling."}), 500
     return jsonify({
-        "message": "OTP sent to your email",
+        "message": "OTP sent successfully to your email address!",
         "email_sent": True
     }), 200
 
