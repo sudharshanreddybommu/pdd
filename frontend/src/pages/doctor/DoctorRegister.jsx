@@ -47,9 +47,13 @@ export default function DoctorRegister() {
   const handleEmailSubmit = async e => {
     e.preventDefault()
     if (!email) return toast.error('Enter your email')
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/
+    if (!emailRegex.test(email.trim())) {
+      return toast.error('Please enter a valid email address (e.g. name@gmail.com)')
+    }
     setLoading(true)
     try {
-      const res = await sendOtp(email, 'doctor')
+      const res = await sendOtp(email.trim(), 'doctor')
       if (res.data.dev_otp) setDevOtp(res.data.dev_otp)
       toast.success('OTP sent to your email!')
       setStep(1)

@@ -3,7 +3,10 @@ import axios from 'axios'
 // Auto-resolve API URL based on environment (mobile app uses live Render server)
 const isLocalDev = window.location.hostname === 'localhost' && (window.location.port === '5173' || window.location.port === '3000' || window.location.port === '5174');
 const API_URL = isLocalDev ? 'http://localhost:5000' : 'https://oralscan-backend-gmup.onrender.com';
-const API = axios.create({ baseURL: API_URL })
+const API = axios.create({ 
+  baseURL: API_URL,
+  timeout: 90000 // 90 seconds timeout for Render cold-starts
+})
 
 API.interceptors.request.use(config => {
   const patientToken = localStorage.getItem('patientToken')

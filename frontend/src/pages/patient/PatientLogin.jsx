@@ -45,16 +45,24 @@ export default function PatientLogin() {
   const handleEmailCheck = async e => {
     e.preventDefault()
     if (!email) return toast.error('Enter your registered email address')
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/
+    if (!emailRegex.test(email.trim())) {
+      return toast.error('Please enter a valid email address (e.g. name@gmail.com)')
+    }
     setLoading(true)
     try {
-      const { data } = await checkPatientEmail(email)
+      const { data } = await checkPatientEmail(email.trim())
       if (!data.exists) {
         toast.warning('No patient account found with this email. Please register first!')
         return
       }
       setUserFound(true)
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to check account')
+      console.error('Email check error:', err)
+      const msg = err.response?.data?.error || 
+        (err.code === 'ECONNABORTED' || err.message?.includes('timeout') ? 'Server is starting up. Please wait 5 seconds and click again.' : 
+        err.message === 'Network Error' ? 'Cannot connect to server. Please try again in a moment.' : 'Failed to check account')
+      toast.error(msg)
     } finally {
       setLoading(false)
     }
@@ -65,17 +73,37 @@ export default function PatientLogin() {
     e.preventDefault()
     if (!email) return toast.error('Enter email')
     if (!password) return toast.error('Enter password')
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/
+    if (!emailRegex.test(email.trim())) {
+      return toast.error('Please enter a valid email address (e.g. name@gmail.com)')
+    }
     setLoading(true)
     try {
-      const res = await patientLogin(email, password)
+      const res = await patientLogin(email.trim(), password)
       localStorage.setItem('patientToken', res.data.token)
       localStorage.setItem('patientUser', JSON.stringify(res.data.patient))
       toast.success('Welcome back!')
       navigate(res.data.patient?.name ? '/patient/home' : '/patient/profile')
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Invalid email or password')
+      console.error('Login submit error:', err)
+      const msg = err.response?.data?.error || 
+        (err.code === 'ECONNABORTED' || err.message?.includes('timeout') ? 'Server is starting up. Please try again in a moment.' : 
+        err.message === 'Network Error' ? 'Cannot connect to server. Please try again in a moment.' : 'Invalid email or password')
+      toast.error(msg)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleTestConnection = async () => {
+    toast.info('Testing connection to Render server...')
+    try {
+      const start = Date.now()
+      const res = await fetch('https://oralscan-backend-gmup.onrender.com/api/notifications', { method: 'GET', mode: 'cors' })
+      const duration = Date.now() - start
+      alert(`✅ Connected successfully!\n\nServer is alive.\nDuration: ${duration}ms\nStatus: ${res.status}`)
+    } catch (err) {
+      alert(`⚠️ Connection Failed!\n\nError Message: ${err.message}\n\nVerify that the phone has internet access and can reach: https://oralscan-backend-gmup.onrender.com`)
     }
   }
 
@@ -284,6 +312,28 @@ export default function PatientLogin() {
                 <Link to="/doctor" style={{ color: 'var(--accent, #6366f1)', fontWeight: 600 }}>
                   Doctor Portal →
                 </Link>
+              </div>
+
+              <div style={{ marginTop: 16, textAlign: 'center' }}>
+                <button
+                  type="button"
+                  onClick={handleTestConnection}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    color: '#94a3b8',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'}
+                >
+                  📡 Test Server Connection
+                </button>
               </div>
             </form>
           )}

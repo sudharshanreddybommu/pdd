@@ -1,5 +1,8 @@
 {
   "appId": "oralscan.ai.app",
   "appName": "OralScan",
-  "webDir": "dist"
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  }
 }

@@ -50,20 +50,28 @@ export default function PatientRegister() {
   const handleEmailSubmit = async e => {
     e.preventDefault()
     if (!email) return toast.error('Enter your email address')
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/
+    if (!emailRegex.test(email.trim())) {
+      return toast.error('Please enter a valid email address (e.g. name@gmail.com)')
+    }
     setLoading(true)
     try {
-      const { data } = await checkPatientEmail(email)
+      const { data } = await checkPatientEmail(email.trim())
       if (data.exists && data.has_password) {
         toast.info('An account with this email already exists. Please login instead.')
         navigate('/patient/login')
         return
       }
-      const res = await sendOtp(email, 'patient')
+      const res = await sendOtp(email.trim(), 'patient')
       if (res.data.dev_otp) setDevOtp(res.data.dev_otp)
       toast.success('OTP sent to your email address!')
       setStep(1)
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to send OTP')
+      console.error('Registration Error:', err)
+      const msg = err.response?.data?.error || 
+        (err.code === 'ECONNABORTED' || err.message?.includes('timeout') ? 'Server is waking up. Please try again in 5 seconds.' : 
+        err.message === 'Network Error' ? 'Connecting to server... Please try again in a moment.' : 'Failed to send OTP')
+      toast.error(msg)
     } finally {
       setLoading(false)
     }

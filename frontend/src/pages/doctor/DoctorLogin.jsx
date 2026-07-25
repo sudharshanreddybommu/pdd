@@ -43,9 +43,13 @@ export default function DoctorLogin() {
   const handleEmailSubmit = async e => {
     e.preventDefault()
     if (!email) return toast.error('Enter your email')
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/
+    if (!emailRegex.test(email.trim())) {
+      return toast.error('Please enter a valid email address (e.g. name@gmail.com)')
+    }
     setLoading(true)
     try {
-      const { data } = await checkDoctorEmail(email)
+      const { data } = await checkDoctorEmail(email.trim())
       if (!data.exists) return toast.error('No registration found. Please register first.')
       if (!data.is_verified) return toast.error('Your account is pending admin verification. Please wait.')
       if (data.has_password) {
