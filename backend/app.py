@@ -185,17 +185,15 @@ def send_otp_email(to_email, otp):
         """
 
         msg.attach(MIMEText(body, 'html'))
-        server = smtplib.SMTP(EMAIL_HOST, EMAIL_PORT)
+        server = smtplib.SMTP(EMAIL_HOST, EMAIL_PORT, timeout=8)
         server.starttls()
         server.login(EMAIL_USER, EMAIL_PASS)
         server.sendmail(EMAIL_USER, to_email, msg.as_string())
         server.quit()
-        print(f"[EMAIL] OTP sent to {to_email}")
+        print(f"[EMAIL] OTP sent successfully to {to_email}")
         return True
     except Exception as e:
-        print(f"[EMAIL ERROR] Failed to send OTP to {to_email}: {e}")
-        import traceback
-        traceback.print_exc()
+        print(f"[EMAIL ERROR] Failed to send OTP email to {to_email}: {e}")
         return False
 
 
