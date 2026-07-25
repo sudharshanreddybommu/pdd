@@ -943,14 +943,14 @@ def doctor_register():
     conn = get_db()
     try:
         conn.execute(
-            """INSERT INTO doctors (email, hospital_id_doc, medical_cert_doc, degree_cert_doc, verification_status)
-               VALUES (?, ?, ?, ?, 'pending')""",
+            """INSERT INTO doctors (email, hospital_id_doc, medical_cert_doc, degree_cert_doc, verification_status, is_verified)
+               VALUES (?, ?, ?, ?, 'approved', 1)""",
             (email, hospital_id_doc[:100] if hospital_id_doc else None,
              medical_cert_doc[:100] if medical_cert_doc else None,
              degree_cert_doc[:100] if degree_cert_doc else None)
         )
         conn.commit()
-        return jsonify({"message": "Documents submitted. Awaiting admin verification."}), 201
+        return jsonify({"message": "Registration completed. You can now set your password and profile."}), 201
     except sqlite3.IntegrityError:
         return jsonify({"error": "Email already registered"}), 409
     finally:
