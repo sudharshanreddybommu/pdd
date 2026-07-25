@@ -438,10 +438,11 @@ def send_otp():
     }
 
     sent = send_otp_email(email, otp)
+    if not sent:
+        return jsonify({"error": "Failed to send OTP email. Please verify your email address or check your internet connection."}), 500
     return jsonify({
         "message": "OTP sent to your email",
-        "dev_otp": otp,
-        "email_sent": sent
+        "email_sent": True
     }), 200
 
 
