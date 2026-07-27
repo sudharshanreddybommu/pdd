@@ -23,7 +23,7 @@ export default function DoctorNavbar({ unread = 0 }) {
   return (
     <nav className="navbar">
       <Link to="/doctor/dashboard" className="navbar-brand">
-        <div className="navbar-brand-icon">🦷</div>
+        <img src="/app-logo.png" alt="OralScan Logo" style={{ width: 32, height: 32, borderRadius: 8, objectFit: 'cover' }} />
         OPMD <span style={{ color: 'var(--primary)', marginLeft: 4 }}>AI</span>
         <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 8, fontWeight: 400 }}>Doctor</span>
       </Link>
