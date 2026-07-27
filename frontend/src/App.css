@@ -53,6 +53,30 @@ body::before {
 .page { min-height: 100vh; min-height: 100dvh; width: 100%; background: transparent; }
 .container { max-width: 1200px; margin: 0 auto; padding: 0 24px; width: 100%; }
 
+.btn-back-arrow {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--glass-border);
+  color: var(--text);
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  outline: none;
+  flex-shrink: 0;
+}
+.btn-back-arrow:hover, .btn-back-arrow:active {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+  transform: translateX(-2px);
+}
+
 /* ── AUTH PAGES ── */
 .auth-page {
   min-height: 100vh;

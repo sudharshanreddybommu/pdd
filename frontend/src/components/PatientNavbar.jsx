@@ -29,12 +29,21 @@ export default function PatientNavbar() {
 
   const isActive = path => location.pathname === path ? 'nav-link active' : 'nav-link'
 
+  const isHome = location.pathname === '/patient/home'
+
   return (
     <nav className="navbar">
-      <Link to="/patient/home" className="navbar-brand">
-        <img src="/app-logo.png" alt="OralScan Logo" style={{ width: 32, height: 32, borderRadius: 8, objectFit: 'cover' }} />
-        OPMD <span style={{color:'var(--primary)',marginLeft:4}}>AI</span>
-      </Link>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        {!isHome && (
+          <button onClick={() => navigate(-1)} className="btn-back-arrow" aria-label="Go Back" title="Go Back">
+            ←
+          </button>
+        )}
+        <Link to="/patient/home" className="navbar-brand">
+          <img src="/app-logo.png" alt="OralScan Logo" style={{ width: 32, height: 32, borderRadius: 8, objectFit: 'cover' }} />
+          OPMD <span style={{color:'var(--primary)',marginLeft:4}}>AI</span>
+        </Link>
+      </div>
       
       <button className="mobile-toggle" onClick={() => setIsOpen(!isOpen)}>
         {isOpen ? '✕' : '☰'}

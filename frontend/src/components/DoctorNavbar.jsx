@@ -20,13 +20,22 @@ export default function DoctorNavbar({ unread = 0 }) {
   }
   const isActive = path => location.pathname === path ? 'nav-link active' : 'nav-link'
 
+  const isDashboard = location.pathname === '/doctor/dashboard'
+
   return (
     <nav className="navbar">
-      <Link to="/doctor/dashboard" className="navbar-brand">
-        <img src="/app-logo.png" alt="OralScan Logo" style={{ width: 32, height: 32, borderRadius: 8, objectFit: 'cover' }} />
-        OPMD <span style={{ color: 'var(--primary)', marginLeft: 4 }}>AI</span>
-        <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 8, fontWeight: 400 }}>Doctor</span>
-      </Link>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        {!isDashboard && (
+          <button onClick={() => navigate(-1)} className="btn-back-arrow" aria-label="Go Back" title="Go Back">
+            ←
+          </button>
+        )}
+        <Link to="/doctor/dashboard" className="navbar-brand">
+          <img src="/app-logo.png" alt="OralScan Logo" style={{ width: 32, height: 32, borderRadius: 8, objectFit: 'cover' }} />
+          OPMD <span style={{ color: 'var(--primary)', marginLeft: 4 }}>AI</span>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 8, fontWeight: 400 }}>Doctor</span>
+        </Link>
+      </div>
 
       <button className="mobile-toggle" onClick={() => setIsOpen(!isOpen)}>
         {isOpen ? '✕' : '☰'}
