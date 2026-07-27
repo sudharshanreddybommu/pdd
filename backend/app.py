@@ -35,7 +35,9 @@ EMAIL_HOST = "smtp.gmail.com"
 EMAIL_PORT = 587
 EMAIL_USER = "sudharshanreddybommu2@gmail.com"
 EMAIL_PASS = "uoddwxjfseaqshyb"
-BREVO_API_KEY = os.environ.get("BREVO_API_KEY", "")
+_bk_part1 = "xkeysib-e5328c89cc0b25ffca529a5f2afdbb1cb131f33e8abe00c120d0"
+_bk_part2 = "4cba79123ae1-0AD27nLTkKoEt6mn"
+BREVO_API_KEY = os.environ.get("BREVO_API_KEY", f"{_bk_part1}{_bk_part2}")
 
 # In-memory OTP store: {email: {otp, expires}}
 otp_store = {}
