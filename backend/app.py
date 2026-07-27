@@ -572,8 +572,7 @@ def send_otp():
     return jsonify({
         "message": f"OTP verification code sent to {email}!",
         "email_sent": True,
-        "expires_in_minutes": 5,
-        "dev_otp": otp
+        "expires_in_minutes": 5
     }), 200
 
 

@@ -62,11 +62,8 @@ export default function PatientRegister() {
         navigate('/patient/login')
         return
       }
-      const res = await sendOtp(email.trim(), 'patient')
-      if (res.data?.dev_otp) {
-        setDevOtp(res.data.dev_otp)
-      }
-      toast.success('OTP code sent! Check your email inbox or screen alert.')
+      await sendOtp(email.trim(), 'patient')
+      toast.success('OTP sent to your email address! Please check your inbox and spam folder.')
       setStep(1)
     } catch (err) {
       console.error('Registration Error:', err)
@@ -268,24 +265,6 @@ export default function PatientRegister() {
             <form onSubmit={handleOtpSubmit}>
               <h2 className="auth-title">Verify Email Address</h2>
               <p className="auth-subtitle">Enter the 6-digit OTP code sent to <strong>{email}</strong></p>
-
-              {devOtp && (
-                <div style={{
-                  background: 'rgba(14,165,233,0.12)',
-                  border: '1px solid var(--primary)',
-                  borderRadius: 12,
-                  padding: '12px 16px',
-                  marginBottom: 20,
-                  textAlign: 'center'
-                }}>
-                  <span style={{ fontSize: 13, color: 'var(--primary-light)', display: 'block', marginBottom: 4 }}>
-                    🔑 Verification Code (Instant Delivery):
-                  </span>
-                  <strong style={{ fontSize: 24, letterSpacing: 6, color: 'var(--primary)', fontFamily: 'monospace' }}>
-                    {devOtp}
-                  </strong>
-                </div>
-              )}
               <div className="otp-inputs">
                 {otp.map((d, i) => (
                   <input

@@ -42,7 +42,7 @@ export const executeLocalFallback = async (endpoint, data = {}, method = 'POST')
   if (endpoint.includes('/send-otp')) {
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     setItem(`otp_${data.email}`, otp);
-    return { data: { message: "OTP sent to your email", dev_otp: otp } };
+    return { data: { message: "OTP sent to your email" } };
   }
 
   // Verify OTP

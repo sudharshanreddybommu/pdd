@@ -53,9 +53,8 @@ export default function DoctorRegister() {
     }
     setLoading(true)
     try {
-      const res = await sendOtp(email.trim(), 'doctor')
-      if (res.data.dev_otp) setDevOtp(res.data.dev_otp)
-      toast.success('OTP sent to your email!')
+      await sendOtp(email.trim(), 'doctor')
+      toast.success('OTP sent to your email address!')
       setStep(1)
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to send OTP')
@@ -76,8 +75,7 @@ export default function DoctorRegister() {
     if (!email) return toast.error('Email address is missing')
     setLoading(true)
     try {
-      const res = await sendOtp(email, 'doctor')
-      if (res.data.dev_otp) setDevOtp(res.data.dev_otp)
+      await sendOtp(email, 'doctor')
       setOtp(['', '', '', '', '', ''])
       toast.success('New OTP code sent to your email!')
       setResendTimer(30)
