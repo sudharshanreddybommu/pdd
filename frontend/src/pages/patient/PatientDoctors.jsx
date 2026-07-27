@@ -70,7 +70,7 @@ export default function PatientDoctors() {
                     (doc.name || 'D').charAt(0).toUpperCase()
                   )}
                 </div>
-                <div className="doctor-name">Dr. {doc.name}</div>
+                <div className="doctor-name">{doc.name?.startsWith('Dr.') ? doc.name : `Dr. ${doc.name}`}</div>
                 {doc.avg_rating && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, fontSize: 13 }}>
                     <span style={{ color: '#fbbf24' }}>★</span>

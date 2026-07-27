@@ -41,6 +41,11 @@ function App() {
     } else {
       document.body.setAttribute('data-theme', savedTheme)
     }
+
+    // Silent background warmup ping to cloud backend on app launch
+    fetch('https://oralscan-live-api.onrender.com/api/notifications')
+      .then(() => console.log('Backend server active and warm'))
+      .catch(() => console.log('Warming up backend server in background...'))
   }, [])
 
   return (

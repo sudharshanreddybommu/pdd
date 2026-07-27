@@ -207,111 +207,101 @@ def send_otp_email(to_email, otp):
 
 def is_valid_oral_cavity(img_b64):
     """
-    Real pixel-level validation to check if image is an oral cavity photo.
-    Analyzes color distribution to detect:
-      - Pinkish-red oral tissue (gums, cheeks, tongue)
-      - Dark interior of mouth (throat/background)
-      - Possibly white teeth
-    Rejects: faces, cars, buildings, landscapes, animals, flowers, etc.
+    Strict pixel-level validation to ensure ONLY authentic oral cavity / mouth photos pass.
+    Analyzes color space, red dominance, saturation, texture variance, and mouth anatomical features.
+    Rejects: face selfies, animals, plants, objects, documents, landscapes, non-oral skin, cars, etc.
     """
     if not img_b64:
         return True
 
-    if len(img_b64) < 100:
+    if len(img_b64) < 200:
         return False
 
     try:
         img_data = base64.b64decode(img_b64.split(',')[-1])
         img = Image.open(io.BytesIO(img_data)).convert('RGB')
-        img = img.resize((120, 120))  # Fast analysis size
+        img = img.resize((150, 150))  # High-resolution pixel grid
         pixels = list(img.getdata())
         total = len(pixels)
 
-        dark_pixels   = 0   # Dark interior of mouth (black/very dark)
-        oral_tissue   = 0   # Pinkish-red flesh (gums, tongue, cheeks)
-        bright_pixels = 0   # White/bright teeth
-        blue_green    = 0   # Blue or green dominant pixels (sky, grass, cars, walls)
-        grey_neutral  = 0   # Neutral grey pixels (cars, buildings, roads)
-        r_values      = []
+        dark_mouth_cavity = 0   # Dark interior cavity of open mouth
+        oral_flesh        = 0   # Pink/red mucosa, gums, tongue tissue
+        bright_teeth      = 0   # Enamel/teeth white highlights
+        blue_green_pixels = 0   # Sky, grass, clothes, outdoor background
+        neutral_grey      = 0   # Objects, walls, paper, cars
+        r_list, g_list, b_list = [], [], []
 
         for r, g, b in pixels:
+            r_list.append(r)
+            g_list.append(g)
+            b_list.append(b)
             brightness = (r + g + b) / 3
-            r_values.append(r)
 
             # --- Dark mouth interior ---
-            if brightness < 55:
-                dark_pixels += 1
+            if brightness < 45:
+                dark_mouth_cavity += 1
 
-            # --- White/bright teeth ---
-            if brightness > 185 and min(r, g, b) > 140:
-                bright_pixels += 1
+            # --- Teeth/White enamel ---
+            if brightness > 170 and r > 140 and g > 140 and b > 120 and abs(r - g) < 30:
+                bright_teeth += 1
 
-            # --- Oral tissue: pinkish-red flesh tones ---
-            # Must be reddish (r dominant), warm, medium brightness
-            if (r > 100 and g > 35 and b > 25 and
-                r > g + 8 and r > b + 8 and
-                60 < brightness < 215 and
-                r - g < 130):   # not neon/artificial red
-                oral_tissue += 1
+            # --- Strict Oral Mucosa/Tongue/Gums Pink-Red Flesh ---
+            # Red must be dominant, warm tone, non-neon, medium-high saturation
+            if (r > 110 and r > g + 12 and r > b + 12 and
+                35 < g < 180 and 30 < b < 160 and
+                50 < brightness < 205):
+                oral_flesh += 1
 
-            # --- Blue or green dominant: sky, grass, water, walls ---
-            if (g > r + 15 and g > b) or (b > r + 15 and b > g):
-                blue_green += 1
+            # --- Non-oral blue/green (outdoor/clothes/walls) ---
+            if (g > r + 10 and g > b) or (b > r + 10 and b > g):
+                blue_green_pixels += 1
 
-            # --- Neutral grey: cars, roads, buildings ---
-            max_ch = max(r, g, b)
-            min_ch = min(r, g, b)
-            if max_ch - min_ch < 25 and 50 < brightness < 210:
-                grey_neutral += 1
+            # --- Neutral grey/monochrome (documents, objects, walls) ---
+            if max(r, g, b) - min(r, g, b) < 20 and 40 < brightness < 220:
+                neutral_grey += 1
 
-        dark_ratio    = dark_pixels   / total
-        oral_ratio    = oral_tissue   / total
-        bright_ratio  = bright_pixels / total
-        blue_green_r  = blue_green    / total
-        grey_neutral_r= grey_neutral  / total
+        dark_ratio       = dark_mouth_cavity / total
+        oral_ratio       = oral_flesh / total
+        teeth_ratio      = bright_teeth / total
+        blue_green_ratio = blue_green_pixels / total
+        grey_ratio       = neutral_grey / total
 
-        # Red channel standard deviation — oral images have high variance
-        r_mean = sum(r_values) / total
-        r_std  = (sum((x - r_mean) ** 2 for x in r_values) / total) ** 0.5
+        # Calculate Color Standard Deviations
+        r_mean = sum(r_list) / total
+        r_std  = (sum((x - r_mean) ** 2 for x in r_list) / total) ** 0.5
 
-        # ── REJECTION RULES ──────────────────────────────────────────
-        # Too many blue/green pixels → landscape, car, sky, grass, wall
-        if blue_green_r > 0.38:
+        g_mean = sum(g_list) / total
+        g_std  = (sum((x - g_mean) ** 2 for x in g_list) / total) ** 0.5
+
+        # ── STRICT REJECTION RULES ───────────────────────────────────────
+        # 1. Any noticeable blue/green (trees, sky, clothing, background) -> REJECT
+        if blue_green_ratio > 0.15:
             return False
 
-        # Too many neutral grey pixels → car, building, road, concrete
-        if grey_neutral_r > 0.45:
+        # 2. Too many neutral grey/white object pixels (paper, walls, objects) -> REJECT
+        if grey_ratio > 0.35:
             return False
 
-        # Almost no dark area AND no bright teeth AND no tissue → wrong image
-        if dark_ratio < 0.03 and bright_ratio < 0.03 and oral_ratio < 0.10:
+        # 3. Low oral pink/red tissue -> REJECT (not a mouth photo)
+        if oral_ratio < 0.22:
             return False
 
-        # Very low red channel variance → uniform image (not inside a mouth)
-        if r_std < 22 and oral_ratio < 0.15:
+        # 4. Low texture/color variance (uniform color, solid objects) -> REJECT
+        if r_std < 28 or g_std < 18:
             return False
 
-        # ── ACCEPTANCE RULES ─────────────────────────────────────────
-        # Must have meaningful oral tissue (pinkish-red flesh)
-        has_oral_tissue = oral_ratio > 0.18
+        # ── STRICT ACCEPTANCE RULE ───────────────────────────────────────
+        # Genuine mouth photo must have BOTH:
+        #  a) At least 22% pink/red oral tissue (mucosa/gums/tongue)
+        #  b) AND either open mouth dark cavity (>3%) OR teeth (>2.5%) OR high anatomical color variance (>35)
+        has_mouth_structure = (dark_ratio > 0.03 or teeth_ratio > 0.025 or r_std > 35)
 
-        # Must show oral structure: either dark mouth interior OR white teeth
-        has_oral_structure = (dark_ratio > 0.06 or bright_ratio > 0.04)
-
-        # Must have enough color variance (oral images are never uniform)
-        has_variance = r_std > 30
-
-        if has_oral_tissue and (has_oral_structure or has_variance):
-            return True
-
-        # Borderline: has tissue AND high variance even without clear structure
-        if oral_ratio > 0.28 and r_std > 40:
+        if oral_ratio >= 0.22 and has_mouth_structure:
             return True
 
         return False
 
     except Exception:
-        # If image can't be decoded, reject it
         return False
 
 
