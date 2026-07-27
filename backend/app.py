@@ -30,11 +30,12 @@ UPLOAD_FOLDER = os.path.join(DATA_DIR, "uploads")
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 
-# Email config - Gmail SMTP
+# Email config - Gmail SMTP & Brevo HTTPS API
 EMAIL_HOST = "smtp.gmail.com"
 EMAIL_PORT = 587
 EMAIL_USER = "sudharshanreddybommu2@gmail.com"
 EMAIL_PASS = "uoddwxjfseaqshyb"
+BREVO_API_KEY = os.environ.get("BREVO_API_KEY", "")
 
 # In-memory OTP store: {email: {otp, expires}}
 otp_store = {}
@@ -141,7 +142,66 @@ def generate_otp():
     return ''.join(random.choices(string.digits, k=6))
 
 
+def send_via_brevo_api(to_email, otp):
+    if not BREVO_API_KEY:
+        return False
+    url = "https://api.brevo.com/v3/smtp/email"
+    headers = {
+        "accept": "application/json",
+        "content-type": "application/json",
+        "api-key": BREVO_API_KEY
+    }
+    body = {
+        "sender": {"name": "OralScan AI", "email": EMAIL_USER},
+        "to": [{"email": to_email}],
+        "subject": "🦷 OralScan AI — Your OTP Verification Code",
+        "htmlContent": f"""
+        <html>
+        <body style="margin:0;padding:0;background:#0f172a;font-family:Arial,sans-serif;">
+          <div style="max-width:480px;margin:40px auto;background:#1e293b;border-radius:16px;overflow:hidden;border:1px solid #334155;">
+            <div style="background:linear-gradient(135deg,#0ea5e9,#6366f1);padding:32px;text-align:center;">
+              <div style="font-size:36px;margin-bottom:8px;">🦷</div>
+              <h1 style="color:#fff;margin:0;font-size:22px;letter-spacing:1px;">OralScan AI</h1>
+              <p style="color:rgba(255,255,255,0.8);margin:6px 0 0;font-size:13px;">OPMD Early Detection Platform</p>
+            </div>
+            <div style="padding:36px 32px;text-align:center;">
+              <h2 style="color:#f1f5f9;margin:0 0 8px;font-size:18px;">Email Verification</h2>
+              <p style="color:#94a3b8;font-size:14px;margin:0 0 28px;line-height:1.6;">
+                Use the OTP below to verify your email address.<br>Do <strong>not</strong> share this code with anyone.
+              </p>
+              <div style="background:#0f172a;border:2px dashed #0ea5e9;border-radius:12px;padding:24px 16px;margin-bottom:28px;display:inline-block;min-width:200px;">
+                <div style="font-size:42px;font-weight:900;letter-spacing:14px;color:#0ea5e9;font-family:monospace;">{otp}</div>
+              </div>
+              <p style="color:#64748b;font-size:13px;margin:0;">
+                ⏱️ This OTP expires in <strong style="color:#f59e0b;">10 minutes</strong>
+              </p>
+            </div>
+            <div style="background:#0f172a;padding:20px 32px;text-align:center;border-top:1px solid #1e293b;">
+              <p style="color:#475569;font-size:11px;margin:0;line-height:1.6;">
+                If you did not request this, please ignore this email.<br>
+                © 2025 OralScan AI — AI-Based Early Detection of OPMDs
+              </p>
+            </div>
+          </div>
+        </body>
+        </html>
+        """
+    }
+    try:
+        req = urllib.request.Request(url, data=json.dumps(body).encode('utf-8'), headers=headers)
+        resp = urllib.request.urlopen(req, timeout=8)
+        print(f"[EMAIL] Sent via Brevo HTTPS API to {to_email}")
+        return True
+    except Exception as e:
+        print(f"[EMAIL ERROR] Brevo HTTPS API failed: {e}")
+        return False
+
+
 def send_otp_email(to_email, otp):
+    # 1. Try Brevo HTTPS API (Bypasses all ISP/Cloud firewall SMTP port blocks)
+    if BREVO_API_KEY and send_via_brevo_api(to_email, otp):
+        return True
+
     try:
         msg = MIMEMultipart('alternative')
         msg['From'] = f"OralScan AI <{EMAIL_USER}>"
