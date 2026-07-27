@@ -185,18 +185,17 @@ def send_otp_email(to_email, otp):
         """
 
         msg.attach(MIMEText(body, 'html'))
-        # Try TLS port 587 first, fallback to SSL port 465 if needed
+        # Try SSL port 465 first (faster, reliable on cloud/local), fallback to TLS port 587
         try:
-            server = smtplib.SMTP(EMAIL_HOST, 587, timeout=15)
-            server.starttls()
-            server.login(EMAIL_USER, EMAIL_PASS)
-            server.sendmail(EMAIL_USER, to_email, msg.as_string())
-            server.quit()
-        except Exception:
-            server = smtplib.SMTP_SSL(EMAIL_HOST, 465, timeout=15)
-            server.login(EMAIL_USER, EMAIL_PASS)
-            server.sendmail(EMAIL_USER, to_email, msg.as_string())
-            server.quit()
+            with smtplib.SMTP_SSL(EMAIL_HOST, 465, timeout=6) as server:
+                server.login(EMAIL_USER, EMAIL_PASS)
+                server.sendmail(EMAIL_USER, to_email, msg.as_string())
+        except Exception as err1:
+            print(f"[EMAIL] SSL 465 failed ({err1}), attempting TLS 587...")
+            with smtplib.SMTP(EMAIL_HOST, 587, timeout=6) as server:
+                server.starttls()
+                server.login(EMAIL_USER, EMAIL_PASS)
+                server.sendmail(EMAIL_USER, to_email, msg.as_string())
 
         print(f"[EMAIL] OTP sent successfully to {to_email}")
         return True
