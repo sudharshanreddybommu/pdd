@@ -157,7 +157,8 @@ def send_via_brevo_api(to_email, otp):
     body = {
         "sender": {"name": "OralScan AI", "email": EMAIL_USER},
         "to": [{"email": to_email}],
-        "subject": "🦷 OralScan AI — Your OTP Verification Code",
+        "subject": f"OralScan AI Verification Code: {otp}",
+        "textContent": f"Your OralScan AI Email Verification Code is: {otp}. Please enter this 6-digit code in the app to complete verification.",
         "htmlContent": f"""
         <html>
         <body style="margin:0;padding:0;background:#0f172a;font-family:Arial,sans-serif;">
