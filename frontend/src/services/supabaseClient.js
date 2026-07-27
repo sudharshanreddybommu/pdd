@@ -6,6 +6,50 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 
 /**
+ * Send 6-digit Email OTP code via Supabase Auth
+ * @param {string} email - e.g. "user@example.com"
+ */
+export const sendSupabaseEmailOtp = async (email) => {
+  const { data, error } = await supabase.auth.signInWithOtp({
+    email: email.trim(),
+    options: {
+      shouldCreateUser: true
+    }
+  })
+  if (error) throw error
+  return data
+}
+
+/**
+ * Verify 6-digit Email OTP code received in email inbox
+ * @param {string} email
+ * @param {string} otpToken - 6 digit numeric code
+ */
+export const verifySupabaseEmailOtp = async (email, otpToken) => {
+  const { data, error } = await supabase.auth.verifyOtp({
+    email: email.trim(),
+    token: otpToken.trim(),
+    type: 'email'
+  })
+  if (error) throw error
+  return data
+}
+
+/**
+ * Login anytime with Email + Password via Supabase Auth
+ * @param {string} email
+ * @param {string} password
+ */
+export const loginSupabaseEmailPassword = async (email, password) => {
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: email.trim(),
+    password: password
+  })
+  if (error) throw error
+  return data
+}
+
+/**
  * Send 6-digit SMS OTP code directly to mobile phone via Supabase Auth
  * @param {string} phoneNumber - e.g. "9876543210" or "+919876543210"
  */
