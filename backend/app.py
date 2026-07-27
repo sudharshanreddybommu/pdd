@@ -124,6 +124,12 @@ def init_db():
         created_at TEXT DEFAULT CURRENT_TIMESTAMP
     )""")
 
+    c.execute("""CREATE TABLE IF NOT EXISTS email_otps (
+        email TEXT PRIMARY KEY,
+        otp TEXT NOT NULL,
+        expires_at TEXT NOT NULL
+    )""")
+
     # Migrate: add payment_screenshot column if it doesn't exist
     try:
         c.execute("ALTER TABLE appointments ADD COLUMN payment_screenshot TEXT")
@@ -147,6 +153,7 @@ def generate_otp():
 
 def send_via_brevo_api(to_email, otp):
     if not BREVO_API_KEY:
+        print("[BREVO EMAIL ERROR] BREVO_API_KEY is missing")
         return False
     url = "https://api.brevo.com/v3/smtp/email"
     headers = {
@@ -158,7 +165,7 @@ def send_via_brevo_api(to_email, otp):
         "sender": {"name": "OralScan AI", "email": EMAIL_USER},
         "to": [{"email": to_email}],
         "subject": f"OralScan AI Verification Code: {otp}",
-        "textContent": f"Your OralScan AI Email Verification Code is: {otp}. Please enter this 6-digit code in the app to complete verification.",
+        "textContent": f"Your OralScan AI Email Verification Code is: {otp}. This code expires in 5 minutes. Do not share it with anyone.",
         "htmlContent": f"""
         <html>
         <body style="margin:0;padding:0;background:#0f172a;font-family:Arial,sans-serif;">
@@ -177,7 +184,7 @@ def send_via_brevo_api(to_email, otp):
                 <div style="font-size:42px;font-weight:900;letter-spacing:14px;color:#0ea5e9;font-family:monospace;">{otp}</div>
               </div>
               <p style="color:#64748b;font-size:13px;margin:0;">
-                ⏱️ This OTP expires in <strong style="color:#f59e0b;">10 minutes</strong>
+                ⏱️ This OTP expires in <strong style="color:#f59e0b;">5 minutes</strong>
               </p>
             </div>
             <div style="background:#0f172a;padding:20px 32px;text-align:center;border-top:1px solid #1e293b;">
@@ -193,11 +200,15 @@ def send_via_brevo_api(to_email, otp):
     }
     try:
         req = urllib.request.Request(url, data=json.dumps(body).encode('utf-8'), headers=headers)
-        resp = urllib.request.urlopen(req, timeout=8)
-        print(f"[EMAIL] Sent via Brevo HTTPS API to {to_email}")
+        resp = urllib.request.urlopen(req, timeout=10)
+        res_data = resp.read().decode('utf-8')
+        print(f"[BREVO EMAIL SUCCESS] Sent OTP to {to_email} | Response: {res_data}")
         return True
     except Exception as e:
-        print(f"[EMAIL ERROR] Brevo HTTPS API failed: {e}")
+        err_msg = str(e)
+        if hasattr(e, 'read'):
+            err_msg += f" | {e.read().decode('utf-8')}"
+        print(f"[BREVO EMAIL ERROR] Failed to send OTP email to {to_email}: {err_msg}")
         return False
 
 
@@ -535,44 +546,70 @@ def ai_predict(left_img_b64, front_img_b64, right_img_b64, symptoms=None):
 
 @app.route('/api/send-otp', methods=['POST'])
 def send_otp():
-    data = request.get_json()
+    data = request.get_json() or {}
     email = data.get('email', '').strip().lower()
     user_type = data.get('user_type', 'patient')
     if not email:
-        return jsonify({"error": "Email is required"}), 400
+        return jsonify({"error": "Email address is required"}), 400
 
     otp = generate_otp()
-    otp_store[email] = {
-        "otp": otp,
-        "expires": (datetime.now() + timedelta(minutes=10)).isoformat()
-    }
+    expires_at = (datetime.now() + timedelta(minutes=5)).isoformat()
 
-    sent = send_otp_email(email, otp)
+    # Store OTP in SQLite database (email_otps table) with 5-minute expiry
+    conn = get_db()
+    conn.execute(
+        "INSERT OR REPLACE INTO email_otps (email, otp, expires_at) VALUES (?, ?, ?)",
+        (email, otp, expires_at)
+    )
+    conn.commit()
+    conn.close()
+
+    # Deliver via Brevo Transactional Email API
+    sent = send_via_brevo_api(email, otp)
+    if not sent:
+        return jsonify({"error": "Failed to deliver OTP email. Please check your email ID and try again."}), 500
+
     return jsonify({
         "message": f"OTP verification code sent to {email}!",
-        "email_sent": sent,
+        "email_sent": True,
+        "expires_in_minutes": 5,
         "dev_otp": otp
     }), 200
 
 
 @app.route('/api/verify-otp', methods=['POST'])
 def verify_otp():
-    data = request.get_json()
+    data = request.get_json() or {}
     email = data.get('email', '').strip().lower()
     otp = data.get('otp', '').strip()
 
-    if email not in otp_store:
-        return jsonify({"error": "No OTP found for this email"}), 400
+    if not email or not otp:
+        return jsonify({"error": "Email and OTP code are required"}), 400
 
-    record = otp_store[email]
-    if datetime.now() > datetime.fromisoformat(record['expires']):
-        del otp_store[email]
-        return jsonify({"error": "OTP has expired. Please request a new one."}), 400
+    conn = get_db()
+    record = conn.execute("SELECT * FROM email_otps WHERE email=?", (email,)).fetchone()
+
+    if not record:
+        conn.close()
+        return jsonify({"error": "No OTP found for this email. Please request a new code."}), 400
+
+    # 5-minute expiry check
+    expires_at = datetime.fromisoformat(record['expires_at'])
+    if datetime.now() > expires_at:
+        conn.execute("DELETE FROM email_otps WHERE email=?", (email,))
+        conn.commit()
+        conn.close()
+        return jsonify({"error": "OTP has expired (5-minute limit). Please request a new code."}), 400
 
     if record['otp'] != otp:
-        return jsonify({"error": "Invalid OTP"}), 400
+        conn.close()
+        return jsonify({"error": "Invalid OTP code. Please check and try again."}), 400
 
-    del otp_store[email]
+    # Delete OTP record after successful verification
+    conn.execute("DELETE FROM email_otps WHERE email=?", (email,))
+    conn.commit()
+    conn.close()
+
     return jsonify({"message": "OTP verified successfully", "verified": True}), 200
 
 
