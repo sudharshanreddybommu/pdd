@@ -2,11 +2,11 @@ import axios from 'axios'
 import { executeLocalFallback } from './localEngine'
 
 const isLocalDev = window.location.hostname === 'localhost' && (window.location.port === '5173' || window.location.port === '3000' || window.location.port === '5174');
-const API_URL = isLocalDev ? 'http://localhost:5000' : 'https://oralscan-live-api.onrender.com';
+const API_URL = isLocalDev ? 'http://localhost:5000' : 'https://oralscan-backend-gmup.onrender.com';
 
 const API = axios.create({ 
   baseURL: API_URL,
-  timeout: 5000 // Fast 5-second timeout before instant fallback
+  timeout: 12000 // 12-second timeout to allow real Gmail SMTP OTP delivery
 })
 
 API.interceptors.request.use(config => {
