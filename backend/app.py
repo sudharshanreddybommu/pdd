@@ -286,7 +286,7 @@ def is_valid_oral_cavity(img_b64):
     Rejects: face selfies, animals, plants, objects, documents, landscapes, non-oral skin, cars, etc.
     """
     if not img_b64:
-        return True
+        return False
 
     if len(img_b64) < 200:
         return False

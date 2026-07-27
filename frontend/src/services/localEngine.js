@@ -100,6 +100,20 @@ export const executeLocalFallback = async (endpoint, data = {}, method = 'POST')
     };
   }
 
+  // Patient Me
+  if (endpoint.includes('/patient/me')) {
+    const user = getItem('patientUser', {});
+    return { data: user };
+  }
+
+  // Patient Profile Update
+  if (endpoint.includes('/patient/profile')) {
+    const user = getItem('patientUser', {});
+    const updatedUser = { ...user, ...data };
+    setItem('patientUser', updatedUser);
+    return { data: { message: "Profile updated", patient: updatedUser } };
+  }
+
   // Doctor Login
   if (endpoint.includes('/doctor/login')) {
     const doctor = {

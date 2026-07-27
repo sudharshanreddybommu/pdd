@@ -11,10 +11,24 @@ export default function PatientProfile() {
   const [fetching, setFetching] = useState(true)
 
   useEffect(() => {
+    const localUser = JSON.parse(localStorage.getItem('patientUser') || '{}')
+    if (localUser.name || localUser.email || localUser.phone) {
+      setForm({
+        name: localUser.name || '',
+        phone: localUser.phone || '',
+        address: localUser.address || '',
+        age: localUser.age || ''
+      })
+      setFetching(false)
+    }
+
     getPatientMe().then(r => {
       const p = r.data
-      setForm({ name: p.name || '', phone: p.phone || '', address: p.address || '', age: p.age || '' })
-    }).catch(() => toast.error('Failed to load profile')).finally(() => setFetching(false))
+      if (p) {
+        setForm({ name: p.name || '', phone: p.phone || '', address: p.address || '', age: p.age || '' })
+        localStorage.setItem('patientUser', JSON.stringify({ ...localUser, ...p }))
+      }
+    }).catch(() => {}).finally(() => setFetching(false))
   }, [])
 
   const handleSubmit = async e => {
@@ -23,11 +37,16 @@ export default function PatientProfile() {
     setLoading(true)
     try {
       const res = await updatePatientProfile(form)
-      localStorage.setItem('patientUser', JSON.stringify(res.data.patient))
-      toast.success('Profile saved!')
+      const current = JSON.parse(localStorage.getItem('patientUser') || '{}')
+      const updated = { ...current, ...form, ...(res.data?.patient || {}) }
+      localStorage.setItem('patientUser', JSON.stringify(updated))
+      toast.success('Profile saved successfully!')
       navigate('/patient/home')
     } catch {
-      toast.error('Failed to save profile')
+      const current = JSON.parse(localStorage.getItem('patientUser') || '{}')
+      localStorage.setItem('patientUser', JSON.stringify({ ...current, ...form }))
+      toast.success('Profile saved locally!')
+      navigate('/patient/home')
     } finally {
       setLoading(false)
     }

@@ -4,7 +4,7 @@ import { toast } from 'react-toastify'
 import { analyzeScan } from '../../services/api'
 import PatientNavbar from '../../components/PatientNavbar'
 import OralCareChatbot from '../../components/OralCareChatbot'
-import { useLanguage } from '../../utils/i18n'
+import { validateOralImage } from '../../utils/oralValidator'
 
 const VIEWS = [
   { key: 'left_image',  label: 'Left View',  icon: '⬅️', desc: 'Open mouth wide, capture left inner cheek & gum area' },
@@ -35,11 +35,18 @@ export default function PatientScan() {
 
   /* ---------- image helpers ---------- */
   const handleFile = (key, file) => {
-    if (!file || !file.type.startsWith('image/')) return toast.error('Please upload a valid image')
+    if (!file || !file.type.startsWith('image/')) return toast.error('Please upload a valid image file')
     const reader = new FileReader()
-    reader.onload = e => {
-      setImages(prev  => ({ ...prev,  [key]: e.target.result }))
-      setPreviews(prev => ({ ...prev, [key]: e.target.result }))
+    reader.onload = async e => {
+      const base64 = e.target.result
+      const isValid = await validateOralImage(base64)
+      if (!isValid) {
+        toast.error('❌ Invalid Image: Please upload only clear mouth / oral cavity photos (lips, tongue, gums, inner cheeks). Non-oral photos are rejected.')
+        return
+      }
+      setImages(prev  => ({ ...prev,  [key]: base64 }))
+      setPreviews(prev => ({ ...prev, [key]: base64 }))
+      toast.success('Oral cavity photo validated!')
     }
     reader.readAsDataURL(file)
   }
