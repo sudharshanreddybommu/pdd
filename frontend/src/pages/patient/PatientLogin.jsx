@@ -2,20 +2,62 @@ import { useState, useRef, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { toast } from 'react-toastify'
 import { sendOtp, verifyOtp, checkPatientEmail, patientLogin, patientRegister } from '../../services/api'
+import { sendPhoneOtp, verifyPhoneOtp } from '../../services/supabaseClient'
 
 export default function PatientLogin() {
   const navigate = useNavigate()
-  const [step, setStep] = useState(0) // 0: Email/Password, 1: OTP Reset
+  const [step, setStep] = useState(0) // 0: Normal Login, 1: Password Reset
+  const [authMethod, setAuthMethod] = useState('email') // 'email' or 'phone'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [phone, setPhone] = useState('')
+  const [phoneOtp, setPhoneOtp] = useState('')
+  const [phoneStep, setPhoneStep] = useState(0) // 0: Send OTP, 1: Verify OTP
   const [otp, setOtp] = useState(['', '', '', '', '', ''])
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const [devOtp, setDevOtp] = useState('')
   const [userFound, setUserFound] = useState(false)
   const [resendTimer, setResendTimer] = useState(0)
   const otpRefs = useRef([])
+
+  const handleSendPhoneOtp = async (e) => {
+    e.preventDefault()
+    if (!phone) return toast.error('Please enter your mobile phone number')
+    setLoading(true)
+    try {
+      await sendPhoneOtp(phone)
+      toast.success('📱 SMS OTP sent to your phone number!')
+      setPhoneStep(1)
+    } catch (err) {
+      console.error('Phone OTP Error:', err)
+      toast.error(err.message || 'Failed to send Phone SMS OTP')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleVerifyPhoneOtp = async (e) => {
+    e.preventDefault()
+    if (!phoneOtp) return toast.error('Please enter the 6-digit OTP code')
+    setLoading(true)
+    try {
+      const data = await verifyPhoneOtp(phone, phoneOtp)
+      localStorage.setItem('patientToken', data.session?.access_token || 'supabase-token')
+      localStorage.setItem('patientUser', JSON.stringify({
+        email: data.user?.email || `${phone}@patient.com`,
+        name: `Patient (${phone})`,
+        phone: phone
+      }))
+      toast.success('Phone verification successful! Welcome back.')
+      navigate('/patient/home')
+    } catch (err) {
+      console.error('Verify Phone OTP Error:', err)
+      toast.error(err.message || 'Invalid SMS OTP code')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
     if (resendTimer > 0) {
@@ -241,10 +283,78 @@ export default function PatientLogin() {
             <span style={{ fontWeight: 700, fontSize: 18 }}>Patient Sign In</span>
           </div>
 
+          {/* Email vs Phone Toggle */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 20 }}>
+            <button
+              type="button"
+              className={`btn btn-sm ${authMethod === 'email' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setAuthMethod('email')}
+            >
+              📧 Email Login
+            </button>
+            <button
+              type="button"
+              className={`btn btn-sm ${authMethod === 'phone' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setAuthMethod('phone')}
+            >
+              📱 Phone SMS OTP
+            </button>
+          </div>
 
+          {step === 0 && authMethod === 'phone' && (
+            phoneStep === 0 ? (
+              <form onSubmit={handleSendPhoneOtp}>
+                <h2 className="auth-title">Phone SMS Sign In</h2>
+                <p className="auth-subtitle">Enter your mobile phone number to receive an SMS OTP</p>
+                <div className="form-group">
+                  <label className="form-label">Mobile Phone Number *</label>
+                  <input
+                    className="form-control"
+                    type="tel"
+                    placeholder="e.g. 9876543210"
+                    value={phone}
+                    onChange={e => setPhone(e.target.value)}
+                    autoFocus
+                    required
+                  />
+                </div>
+                <button className="btn btn-primary btn-block btn-lg" disabled={loading}>
+                  {loading ? <div className="spinner" /> : '📱 Send Phone SMS OTP →'}
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={handleVerifyPhoneOtp}>
+                <h2 className="auth-title">Verify Phone OTP</h2>
+                <p className="auth-subtitle">Enter the 6-digit SMS OTP sent to <strong>{phone}</strong></p>
+                <div className="form-group">
+                  <label className="form-label">6-Digit SMS OTP Code *</label>
+                  <input
+                    className="form-control"
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="e.g. 123456"
+                    value={phoneOtp}
+                    onChange={e => setPhoneOtp(e.target.value)}
+                    autoFocus
+                    required
+                  />
+                </div>
+                <button className="btn btn-primary btn-block btn-lg" disabled={loading}>
+                  {loading ? <div className="spinner" /> : '✓ Verify & Sign In →'}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-block mt-2"
+                  onClick={() => setPhoneStep(0)}
+                >
+                  ← Change Phone Number
+                </button>
+              </form>
+            )
+          )}
 
           {/* Login Form */}
-          {step === 0 && (
+          {step === 0 && authMethod === 'email' && (
             <form onSubmit={handleLoginSubmit}>
               <h2 className="auth-title">Welcome Back</h2>
               <p className="auth-subtitle">Enter your registered email and password to sign in</p>
