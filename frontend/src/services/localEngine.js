@@ -47,11 +47,11 @@ export const executeLocalFallback = async (endpoint, data = {}, method = 'POST')
 
   // Verify OTP
   if (endpoint.includes('/verify-otp')) {
-    const stored = getItem(`otp_${data.email}`, '123456');
-    if (data.otp === stored || data.otp === '123456') {
+    const stored = getItem(`otp_${data.email}`, null);
+    if (stored && data.otp === stored) {
       return { data: { verified: true, message: "OTP verified successfully" } };
     }
-    return { data: { verified: true, message: "OTP verified successfully" } };
+    throw { response: { data: { error: "Invalid OTP code. Please enter the exact 6-digit OTP code sent to your email inbox." } } };
   }
 
   // Patient Register

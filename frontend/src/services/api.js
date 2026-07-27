@@ -29,7 +29,7 @@ const requestWithFallback = async (method, url, data = null) => {
     else if (method === 'delete') res = await API.delete(url);
     return res;
   } catch (err) {
-    if (url.includes('otp') && err.response) {
+    if (url.includes('otp')) {
       throw err;
     }
     console.warn(`Cloud API (${url}) unreachable/sleeping. Activating local engine fallback...`, err);
