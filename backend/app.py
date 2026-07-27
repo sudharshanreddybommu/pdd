@@ -40,6 +40,25 @@ _bk_part1 = "xkeysib-e5328c89cc0b25ffca529a5f2afdbb1cb131f33e8abe00c120d0"
 _bk_part2 = "4cba79123ae1-0AD27nLTkKoEt6mn"
 BREVO_API_KEY = os.environ.get("BREVO_API_KEY", f"{_bk_part1}{_bk_part2}")
 
+# Firebase Firestore initialization
+db_firestore = None
+try:
+    import firebase_admin
+    from firebase_admin import credentials, firestore
+    if not firebase_admin._apps:
+        cred_path = os.environ.get("FIREBASE_CREDENTIALS_PATH", os.path.join(DATA_DIR, "firebase_service_account.json"))
+        if os.path.exists(cred_path):
+            cred = credentials.Certificate(cred_path)
+            firebase_admin.initialize_app(cred)
+            db_firestore = firestore.client()
+            print("[FIREBASE] Firestore Admin SDK initialized successfully!")
+        else:
+            print("[FIREBASE] Service account key not found, operating in dual SQLite + Firestore-ready mode.")
+    else:
+        db_firestore = firestore.client()
+except Exception as fb_err:
+    print(f"[FIREBASE] SDK Note: {fb_err}")
+
 # In-memory OTP store: {email: {otp, expires}}
 otp_store = {}
 
@@ -127,8 +146,15 @@ def init_db():
     c.execute("""CREATE TABLE IF NOT EXISTS email_otps (
         email TEXT PRIMARY KEY,
         otp TEXT NOT NULL,
-        expires_at TEXT NOT NULL
+        expires_at TEXT NOT NULL,
+        attempts INTEGER DEFAULT 0
     )""")
+
+    # Migrate: add attempts column if it doesn't exist
+    try:
+        c.execute("ALTER TABLE email_otps ADD COLUMN attempts INTEGER DEFAULT 0")
+    except Exception:
+        pass
 
     # Migrate: add payment_screenshot column if it doesn't exist
     try:
@@ -153,8 +179,8 @@ def generate_otp():
 
 def send_via_brevo_api(to_email, otp):
     if not BREVO_API_KEY:
-        print("[BREVO EMAIL ERROR] BREVO_API_KEY is missing")
-        return False
+        print("[BREVO EMAIL ERROR] BREVO_API_KEY is missing from environment variables.")
+        return False, "BREVO_API_KEY is missing."
     url = "https://api.brevo.com/v3/smtp/email"
     headers = {
         "accept": "application/json",
@@ -178,7 +204,7 @@ def send_via_brevo_api(to_email, otp):
             <div style="padding:36px 32px;text-align:center;">
               <h2 style="color:#f1f5f9;margin:0 0 8px;font-size:18px;">Email Verification</h2>
               <p style="color:#94a3b8;font-size:14px;margin:0 0 28px;line-height:1.6;">
-                Use the OTP below to verify your email address.<br>Do <strong>not</strong> share this code with anyone.
+                Use the 6-digit OTP below to verify your email address.<br>Do <strong>not</strong> share this code with anyone.
               </p>
               <div style="background:#0f172a;border:2px dashed #0ea5e9;border-radius:12px;padding:24px 16px;margin-bottom:28px;display:inline-block;min-width:200px;">
                 <div style="font-size:42px;font-weight:900;letter-spacing:14px;color:#0ea5e9;font-family:monospace;">{otp}</div>
@@ -200,19 +226,43 @@ def send_via_brevo_api(to_email, otp):
     }
     try:
         req = urllib.request.Request(url, data=json.dumps(body).encode('utf-8'), headers=headers)
-        resp = urllib.request.urlopen(req, timeout=10)
-        res_data = resp.read().decode('utf-8')
-        print(f"[BREVO EMAIL SUCCESS] Sent OTP to {to_email} | Response: {res_data}")
-        return True
+        with urllib.request.urlopen(req, timeout=10) as response:
+            res_data = response.read().decode('utf-8')
+            parsed = json.loads(res_data) if res_data else {}
+            msg_id = parsed.get("messageId", "N/A")
+            print(f"[BREVO RESPONSE] Status: {response.status} | Body: {res_data}")
+            print(f"[EMAIL SENT SUCCESS] MessageId: {msg_id} to {to_email}")
+            return True, f"Sent (MessageId: {msg_id})"
+    except urllib.error.HTTPError as he:
+        err_body = he.read().decode('utf-8') if hasattr(he, 'read') else str(he)
+        print(f"[BREVO API HTTP ERROR] Status: {he.code} | Details: {err_body}")
+        return False, f"Brevo HTTP Error {he.code}: {err_body}"
     except Exception as e:
-        err_msg = str(e)
-        if hasattr(e, 'read'):
-            err_msg += f" | {e.read().decode('utf-8')}"
-        print(f"[BREVO EMAIL ERROR] Failed to send OTP email to {to_email}: {err_msg}")
-        return False
+        print(f"[BREVO EMAIL ERROR] Failed to send OTP email to {to_email}: {e}")
+        return False, str(e)
 
 
 def send_otp_email(to_email, otp):
+    success, msg = send_via_brevo_api(to_email, otp)
+    if success:
+        return True, msg
+
+    # Fallback to SMTP if configured
+    try:
+        msg_obj = MIMEMultipart('alternative')
+        msg_obj['From'] = f"OralScan AI <{EMAIL_USER}>"
+        msg_obj['To'] = to_email
+        msg_obj['Subject'] = f"OralScan AI Verification Code: {otp}"
+        msg_obj.attach(MIMEText(f"Your OralScan AI OTP is {otp}", 'plain'))
+        server = smtplib.SMTP_SSL(EMAIL_HOST, 465, timeout=5)
+        server.login(EMAIL_USER, EMAIL_PASS)
+        server.sendmail(EMAIL_USER, to_email, msg_obj.as_string())
+        server.quit()
+        print(f"[SMTP EMAIL SUCCESS] Sent OTP to {to_email}")
+        return True, "Sent via SMTP SSL"
+    except Exception as smtp_err:
+        print(f"[SMTP FALLBACK ERROR] {smtp_err}")
+        return False, msg
     # 1. Try Brevo HTTPS API (Bypasses all ISP/Cloud firewall SMTP port blocks)
     if BREVO_API_KEY and send_via_brevo_api(to_email, otp):
         return True
@@ -552,25 +602,48 @@ def send_otp():
     if not email:
         return jsonify({"error": "Email address is required"}), 400
 
+    # 1. Generate a fresh random 6-digit OTP every time
     otp = generate_otp()
     expires_at = (datetime.now() + timedelta(minutes=5)).isoformat()
+    print(f"[OTP GENERATED] Email: {email} | OTP: {otp} | UserType: {user_type}")
 
-    # Store OTP in SQLite database (email_otps table) with 5-minute expiry
+    # 2. Delete any previous OTP for that email & save in SQLite
     conn = get_db()
+    conn.execute("DELETE FROM email_otps WHERE email=?", (email,))
     conn.execute(
-        "INSERT OR REPLACE INTO email_otps (email, otp, expires_at) VALUES (?, ?, ?)",
+        "INSERT INTO email_otps (email, otp, expires_at, attempts) VALUES (?, ?, ?, 0)",
         (email, otp, expires_at)
     )
     conn.commit()
     conn.close()
 
-    # Deliver via Brevo Transactional Email API
-    sent = send_via_brevo_api(email, otp)
-    if not sent:
-        return jsonify({"error": "Failed to deliver OTP email. Please check your email ID and try again."}), 500
+    # Save to Firestore if connected
+    if db_firestore:
+        try:
+            db_firestore.collection('email_otps').document(email).set({
+                'email': email,
+                'otp': otp,
+                'expires_at': expires_at,
+                'attempts': 0,
+                'created_at': datetime.now().isoformat()
+            })
+            print(f"[FIRESTORE OTP SAVED] Email: {email}")
+        except Exception as fb_e:
+            print(f"[FIRESTORE NOTE] {fb_e}")
 
+    print(f"[OTP SAVED] Email: {email} | Expires: {expires_at} (5-min limit)")
+
+    # 3. Deliver via Brevo Transactional Email API
+    success, result_msg = send_otp_email(email, otp)
+    
+    # 4. Do NOT display "OTP Sent" / return success unless Brevo confirms delivery success!
+    if not success:
+        print(f"[DELIVERY FAILED] Email: {email} | Reason: {result_msg}")
+        return jsonify({"error": f"Failed to deliver OTP email: {result_msg}. Please verify your email address."}), 500
+
+    print(f"[EMAIL SENT SUCCESS] Sent OTP to {email}")
     return jsonify({
-        "message": f"OTP verification code sent to {email}!",
+        "message": f"Verification code sent to {email}. Please check your inbox or spam folder.",
         "email_sent": True,
         "expires_in_minutes": 5
     }), 200
@@ -583,14 +656,27 @@ def verify_otp():
     otp = data.get('otp', '').strip()
 
     if not email or not otp:
-        return jsonify({"error": "Email and OTP code are required"}), 400
+        return jsonify({"error": "Email address and 6-digit OTP code are required"}), 400
 
     conn = get_db()
     record = conn.execute("SELECT * FROM email_otps WHERE email=?", (email,)).fetchone()
 
     if not record:
         conn.close()
-        return jsonify({"error": "No OTP found for this email. Please request a new code."}), 400
+        return jsonify({"error": "No active OTP found for this email. Please request a new OTP code."}), 400
+
+    attempts = record['attempts'] + 1
+
+    # Max 5 attempts check
+    if attempts > 5:
+        conn.execute("DELETE FROM email_otps WHERE email=?", (email,))
+        conn.commit()
+        conn.close()
+        print(f"[OTP BLOCKED] Email: {email} exceeded max 5 attempts.")
+        return jsonify({"error": "Maximum verification attempts (5) exceeded. Please request a new OTP."}), 400
+
+    conn.execute("UPDATE email_otps SET attempts=? WHERE email=?", (attempts, email))
+    conn.commit()
 
     # 5-minute expiry check
     expires_at = datetime.fromisoformat(record['expires_at'])
@@ -598,18 +684,65 @@ def verify_otp():
         conn.execute("DELETE FROM email_otps WHERE email=?", (email,))
         conn.commit()
         conn.close()
-        return jsonify({"error": "OTP has expired (5-minute limit). Please request a new code."}), 400
+        print(f"[OTP EXPIRED] Email: {email} expired (5-min limit).")
+        return jsonify({"error": "OTP code has expired (5-minute limit). Please request a new OTP."}), 400
 
+    # OTP match check
     if record['otp'] != otp:
         conn.close()
-        return jsonify({"error": "Invalid OTP code. Please check and try again."}), 400
+        print(f"[OTP MISMATCH] Email: {email} | Attempt: {attempts}/5")
+        return jsonify({"error": f"Invalid OTP code. {5 - attempts} attempts remaining."}), 400
 
-    # Delete OTP record after successful verification
+    # SUCCESS: Delete OTP after successful verification (Never reuse OTP)
     conn.execute("DELETE FROM email_otps WHERE email=?", (email,))
     conn.commit()
     conn.close()
 
-    return jsonify({"message": "OTP verified successfully", "verified": True}), 200
+    if db_firestore:
+        try:
+            db_firestore.collection('email_otps').document(email).delete()
+        except Exception:
+            pass
+
+    print(f"[OTP VERIFIED] Email: {email} | Verified successfully and deleted from database.")
+    return jsonify({"message": "OTP verified successfully!", "verified": True}), 200
+
+
+@app.route('/api/reset-password', methods=['POST'])
+def reset_password():
+    data = request.get_json() or {}
+    email = data.get('email', '').strip().lower()
+    otp = data.get('otp', '').strip()
+    new_password = data.get('new_password', '')
+    user_type = data.get('user_type', 'patient')
+
+    if not email or not new_password:
+        return jsonify({"error": "Email and new password are required"}), 400
+
+    if len(new_password) < 6:
+        return jsonify({"error": "New password must be at least 6 characters long"}), 400
+
+    hashed_pw = hash_password(new_password)
+    table = "patients" if user_type == "patient" else "doctors"
+
+    conn = get_db()
+    user = conn.execute(f"SELECT * FROM {table} WHERE email=?", (email,)).fetchone()
+    if not user:
+        conn.close()
+        return jsonify({"error": f"No registered {user_type} account found with email {email}"}), 404
+
+    conn.execute(f"UPDATE {table} SET password=? WHERE email=?", (hashed_pw, email))
+    conn.commit()
+    conn.close()
+
+    if db_firestore:
+        try:
+            db_firestore.collection(table).document(email).update({'password': hashed_pw})
+        except Exception:
+            pass
+
+    print(f"[PASSWORD RESET SUCCESS] Email: {email} ({user_type})")
+    return jsonify({"message": "Password reset successfully! Please login with your new password."}), 200
 
 
 # ─── PATIENT ROUTES ───────────────────────────────────────────────────────────

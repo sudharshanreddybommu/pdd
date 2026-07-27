@@ -39,6 +39,7 @@ const requestWithFallback = async (method, url, data = null) => {
 
 export const sendOtp = (email, user_type) => requestWithFallback('post', '/send-otp', { email, user_type })
 export const verifyOtp = (email, otp) => requestWithFallback('post', '/verify-otp', { email, otp })
+export const resetPassword = (email, otp, new_password, user_type) => requestWithFallback('post', '/reset-password', { email, otp, new_password, user_type })
 
 // Patient API
 export const checkPatientEmail = email => requestWithFallback('post', '/patient/check-email', { email })
