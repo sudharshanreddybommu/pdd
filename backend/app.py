@@ -696,11 +696,28 @@ def send_verification_link_via_brevo(to_email, token, user_type="patient"):
             res_data = response.read().decode('utf-8')
             parsed = json.loads(res_data) if res_data else {}
             msg_id = parsed.get("messageId", "N/A")
-            print(f"[VERIFICATION EMAIL SUCCESS] Sent link to {to_email} (MessageId: {msg_id})")
-            return True, f"Sent (MessageId: {msg_id})"
-    except Exception as e:
-        print(f"[VERIFICATION EMAIL ERROR] {e}")
-        return False, str(e)
+            print(f"[VERIFICATION EMAIL SUCCESS] Sent link via Brevo to {to_email} (MessageId: {msg_id})")
+            return True, f"Sent via Brevo (MessageId: {msg_id})"
+    except Exception as brevo_err:
+        print(f"[BREVO VERIFICATION LINK ERROR] {brevo_err}. Attempting SMTP fallback...")
+
+    # Fallback to SMTP SSL/TLS
+    try:
+        msg_obj = MIMEMultipart('alternative')
+        msg_obj['From'] = f"OralScan AI <{EMAIL_USER}>"
+        msg_obj['To'] = to_email
+        msg_obj['Subject'] = "✉️ Verify your Email Address — OralScan AI"
+        msg_obj.attach(MIMEText(body['htmlContent'], 'html'))
+        
+        server = smtplib.SMTP_SSL(EMAIL_HOST, 465, timeout=10)
+        server.login(EMAIL_USER, EMAIL_PASS)
+        server.sendmail(EMAIL_USER, to_email, msg_obj.as_string())
+        server.quit()
+        print(f"[SMTP VERIFICATION EMAIL SUCCESS] Sent link to {to_email}")
+        return True, "Sent via SMTP SSL"
+    except Exception as smtp_err:
+        print(f"[SMTP VERIFICATION FALLBACK ERROR] {smtp_err}")
+        return False, str(smtp_err)
 
 
 # ─── AUTH ROUTES ──────────────────────────────────────────────────────────────
