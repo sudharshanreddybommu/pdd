@@ -19,6 +19,8 @@ import DoctorLogin from './pages/doctor/DoctorLogin'
 import DoctorDashboard from './pages/doctor/DoctorDashboard'
 import DoctorProfile from './pages/doctor/DoctorProfile'
 
+import VerifyEmail from './pages/VerifyEmail'
+
 import './App.css'
 
 import { useEffect } from 'react'
@@ -64,6 +66,9 @@ function App() {
         <Route path="/patient/results" element={<PatientPrivateRoute><PatientResults /></PatientPrivateRoute>} />
         <Route path="/patient/doctors" element={<PatientPrivateRoute><PatientDoctors /></PatientPrivateRoute>} />
         <Route path="/patient/appointments" element={<PatientPrivateRoute><PatientAppointments /></PatientPrivateRoute>} />
+
+        {/* Email Verification Route */}
+        <Route path="/verify-email" element={<VerifyEmail />} />
 
         {/* Doctor Routes */}
         <Route path="/doctor" element={<DoctorLanding />} />

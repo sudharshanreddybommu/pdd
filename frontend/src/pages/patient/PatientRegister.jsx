@@ -1,52 +1,60 @@
-import { useState, useRef, useEffect } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { toast } from 'react-toastify'
-import { sendOtp, verifyOtp, checkPatientEmail, patientRegister } from '../../services/api'
+import { sendVerificationLink, checkEmailVerificationStatus, checkPatientEmail, patientRegister, sendOtp, verifyOtp } from '../../services/api'
 
-const STEPS = ['Email', 'OTP Verification', 'Account Details']
+const STEPS = ['Email', 'Email Link Verification', 'Account Details']
 
 export default function PatientRegister() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+
   const [step, setStep] = useState(0)
   const [email, setEmail] = useState('')
-  const [otp, setOtp] = useState(['', '', '', '', '', ''])
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [age, setAge] = useState('')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [loading, setLoading] = useState(false)
-  const [devOtp, setDevOtp] = useState('')
-  const [resendTimer, setResendTimer] = useState(0)
-  const otpRefs = useRef([])
+  const [waitingForVerification, setWaitingForVerification] = useState(false)
 
-  // Countdown timer for Resend OTP
+  // OTP Fallback Option
+  const [useOtpFallback, setUseOtpFallback] = useState(false)
+  const [otp, setOtp] = useState(['', '', '', '', '', ''])
+
+  // Check URL query parameters if returning from email link click
   useEffect(() => {
-    if (resendTimer > 0) {
-      const timer = setInterval(() => setResendTimer(t => t - 1), 1000)
-      return () => clearInterval(timer)
+    const urlEmail = searchParams.get('email')
+    const urlVerified = searchParams.get('verified')
+    if (urlEmail && urlVerified === 'true') {
+      setEmail(urlEmail)
+      setStep(2)
+      toast.success('Email verified successfully! Complete your account details below.')
     }
-  }, [resendTimer])
+  }, [searchParams])
 
-  // Resend OTP Handler
-  const handleResendOtp = async () => {
-    if (!email) return toast.error('Email address is missing')
-    setLoading(true)
-    try {
-      const res = await sendOtp(email, 'patient')
-      if (res.data.dev_otp) setDevOtp(res.data.dev_otp)
-      setOtp(['', '', '', '', '', ''])
-      toast.success('New OTP code sent to your email!')
-      setResendTimer(30)
-      setTimeout(() => otpRefs.current[0]?.focus(), 100)
-    } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to resend OTP')
-    } finally {
-      setLoading(false)
+  // Background polling for Email Verification Status
+  useEffect(() => {
+    let interval
+    if (waitingForVerification && email && step === 1) {
+      interval = setInterval(async () => {
+        try {
+          const res = await checkEmailVerificationStatus(email)
+          if (res.data?.verified) {
+            toast.success('🎉 Email verified from your email inbox! Proceeding...')
+            setWaitingForVerification(false)
+            setStep(2)
+          }
+        } catch (err) {
+          console.log('Polling check note:', err)
+        }
+      }, 3000)
     }
-  }
+    return () => clearInterval(interval)
+  }, [waitingForVerification, email, step])
 
-  // Step 1: Send OTP to Email
+  // Step 1: Send Verification Link to Email
   const handleEmailSubmit = async e => {
     e.preventDefault()
     if (!email) return toast.error('Enter your email address')
@@ -62,33 +70,33 @@ export default function PatientRegister() {
         navigate('/patient/login')
         return
       }
-      await sendOtp(email.trim(), 'patient')
-      toast.success('OTP sent to your email address! Please check your inbox and spam folder.')
+
+      await sendVerificationLink(email.trim(), 'patient')
+      toast.success('✉️ Verification link sent to your email! Please check your Gmail inbox / spam folder and click the link.')
+      setWaitingForVerification(true)
       setStep(1)
     } catch (err) {
       console.error('Registration Error:', err)
-      const msg = err.response?.data?.error || 
-        (err.code === 'ECONNABORTED' || err.message?.includes('timeout') ? 'Server is waking up. Please try again in 5 seconds.' : 
-        err.message === 'Network Error' ? 'Connecting to server... Please try again in a moment.' : 'Failed to send OTP')
-      toast.error(msg)
+      toast.error(err.response?.data?.error || 'Failed to send verification link')
     } finally {
       setLoading(false)
     }
   }
 
-  // OTP Input Handlers
-  const handleOtpChange = (val, idx) => {
-    const next = [...otp]
-    next[idx] = val.slice(-1)
-    setOtp(next)
-    if (val && idx < 5) otpRefs.current[idx + 1]?.focus()
+  // Switch to OTP fallback if requested
+  const handleSwitchToOtp = async () => {
+    setLoading(true)
+    try {
+      await sendOtp(email, 'patient')
+      setUseOtpFallback(true)
+      toast.success('6-digit OTP sent to your email address!')
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to send OTP')
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const handleOtpKey = (e, idx) => {
-    if (e.key === 'Backspace' && !otp[idx] && idx > 0) otpRefs.current[idx - 1]?.focus()
-  }
-
-  // Step 2: Verify OTP
   const handleOtpSubmit = async e => {
     e.preventDefault()
     const code = otp.join('')
@@ -99,7 +107,7 @@ export default function PatientRegister() {
       toast.success('Email verified successfully!')
       setStep(2)
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Invalid or expired OTP')
+      toast.error(err.response?.data?.error || 'Invalid OTP code')
     } finally {
       setLoading(false)
     }
@@ -119,256 +127,211 @@ export default function PatientRegister() {
         password,
         name: name.trim(),
         phone: phone.trim(),
-        age: age ? parseInt(age, 10) : null
+        age: age ? parseInt(age) : null
       })
-      localStorage.setItem('patientToken', res.data.token)
-      localStorage.setItem('patientUser', JSON.stringify(res.data.patient))
-      toast.success('Registration successful! Welcome to OralScan AI.')
+      
+      const token = res.data.access_token || res.data.token
+      localStorage.setItem('patientToken', token)
+      localStorage.setItem('patientUser', JSON.stringify({
+        email,
+        name: name.trim(),
+        phone: phone.trim(),
+        age: age ? parseInt(age) : null
+      }))
+      toast.success('Patient account created successfully!')
       navigate('/patient/home')
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Registration failed')
+      console.error('Final Registration Error:', err)
+      toast.error(err.response?.data?.error || 'Registration failed. Please try again.')
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="auth-page">
-      {/* Hero Left Side */}
-      <div className="auth-left">
-        <div className="auth-logo">
-          <div className="auth-logo-icon">🦷</div>
-          <div className="auth-logo-text">OPMD <span>AI</span></div>
-        </div>
-        <h1 className="auth-hero-title">Patient<br /><span>Registration</span></h1>
-        <p className="auth-hero-desc">
-          Create your patient account to perform instant AI oral cavity scans, track health reports, and consult top oral oncologists and dentists.
-        </p>
-        <div className="auth-features">
-          {[
-            ['📋', 'Personalized Profile', 'Store your scan history and health profile securely'],
-            ['🤖', 'AI Early Screening', 'Scan left, front, & right views with instant OPMD reports'],
-            ['📄', 'Printable Reports', 'Generate official downloadable medical screening reports'],
-            ['👨‍⚕️', 'Specialist Consultations', 'Book appointments directly with verified doctors']
-          ].map(([icon, title, desc]) => (
-            <div className="auth-feature" key={title}>
-              <div className="auth-feature-icon">{icon}</div>
-              <div>
-                <strong style={{ color: 'var(--text)' }}>{title}</strong>
-                <br />
-                <span style={{ fontSize: 13 }}>{desc}</span>
+    <div className="auth-page fade-in">
+      <div className="auth-card" style={{ maxWidth: 500, width: '100%' }}>
+        {/* Step Indicator */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 24, position: 'relative' }}>
+          {STEPS.map((s, idx) => (
+            <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 1 }}>
+              <div style={{
+                width: 32, height: 32, borderRadius: '50%',
+                background: step >= idx ? 'var(--primary)' : 'var(--surface-2)',
+                color: step >= idx ? '#fff' : 'var(--text-muted)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontWeight: 700, fontSize: 14, border: '2px solid var(--border)'
+              }}>
+                {idx + 1}
               </div>
+              <span style={{ fontSize: 11, marginTop: 4, color: step >= idx ? 'var(--text)' : 'var(--text-muted)', fontWeight: 600 }}>{s}</span>
             </div>
           ))}
         </div>
-      </div>
 
-      {/* Auth Form Right Side */}
-      <div className="auth-right">
-        <div className="auth-card fade-in">
-          {/* Top Login / Register Tab Switcher */}
-          <div style={{
-            display: 'flex',
-            background: 'var(--surface-2)',
-            borderRadius: 12,
-            padding: 4,
-            marginBottom: 24,
-            border: '1px solid var(--border)'
-          }}>
+        {/* STEP 0: Email Input */}
+        {step === 0 && (
+          <form onSubmit={handleEmailSubmit}>
+            <h2 className="auth-title">Create Patient Account</h2>
+            <p className="auth-subtitle">Enter your email address to receive a verification link</p>
+
+            <div className="form-group">
+              <label className="form-label">Email Address *</label>
+              <input
+                className="form-control"
+                type="email"
+                placeholder="you@example.com"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                autoFocus
+                required
+              />
+            </div>
+
+            <button className="btn btn-primary btn-block btn-lg" disabled={loading}>
+              {loading ? <div className="spinner" /> : '✉️ Send Verification Email Link →'}
+            </button>
+          </form>
+        )}
+
+        {/* STEP 1: Waiting for Email Verification Link Click */}
+        {step === 1 && !useOtpFallback && (
+          <div style={{ textAlign: 'center', padding: '10px 0' }}>
+            <div style={{ fontSize: 48, marginBottom: 12 }}>📩</div>
+            <h2 className="auth-title">Check Your Email Inbox</h2>
+            <p className="auth-subtitle">
+              We sent a verification link to <strong style="color:var(--primary);">{email}</strong>.<br />
+              Please open your <strong>Gmail Inbox / Spam folder</strong> and click <strong>"Verify Email"</strong>.
+            </p>
+
+            <div style={{
+              background: 'var(--surface-2)', padding: 16, borderRadius: 12, border: '1px dashed var(--primary)',
+              marginBottom: 20, fontSize: 13, color: 'var(--text-muted)'
+            }}>
+              ⏳ Waiting for email link click... This screen will automatically update as soon as you click the link in your email!
+            </div>
+
+            <div className="spinner" style={{ margin: '0 auto 20px' }} />
+
             <button
               type="button"
-              onClick={() => navigate('/patient/login')}
-              style={{
-                flex: 1,
-                padding: '10px 0',
-                border: 'none',
-                borderRadius: 8,
-                background: 'transparent',
-                color: 'var(--text-muted)',
-                fontWeight: 600,
-                fontSize: 14,
-                cursor: 'pointer',
-                transition: 'all 0.2s'
-              }}
+              className="btn btn-secondary btn-block"
+              onClick={handleSwitchToOtp}
+              disabled={loading}
             >
-              🔑 Patient Login
+              🔢 Prefer entering 6-Digit OTP Code instead? Click Here
             </button>
+
             <button
               type="button"
-              style={{
-                flex: 1,
-                padding: '10px 0',
-                border: 'none',
-                borderRadius: 8,
-                background: 'var(--primary)',
-                color: '#fff',
-                fontWeight: 700,
-                fontSize: 14,
-                cursor: 'default',
-                boxShadow: '0 2px 10px rgba(14,165,233,0.3)'
-              }}
+              className="btn btn-link btn-block mt-2"
+              onClick={() => setStep(0)}
             >
-              📝 Patient Register
+              ← Change Email Address
             </button>
           </div>
+        )}
 
-          <div className="auth-logo mb-2">
-            <div className="auth-logo-icon" style={{ width: 40, height: 40, fontSize: 20 }}>🦷</div>
-            <span style={{ fontWeight: 700, fontSize: 18 }}>Patient Registration</span>
-          </div>
+        {/* STEP 1 (Fallback): Enter 6-Digit OTP */}
+        {step === 1 && useOtpFallback && (
+          <form onSubmit={handleOtpSubmit}>
+            <h2 className="auth-title">Enter 6-Digit OTP</h2>
+            <p className="auth-subtitle">Enter the code sent to <strong>{email}</strong></p>
 
-          {/* Step Indicator */}
-          <div className="step-indicator mb-3">
-            {STEPS.map((s, i) => (
-              <div className="step" key={s} style={{ flex: 1 }}>
-                <div className={`step-dot ${i < step ? 'done' : i === step ? 'active' : 'pending'}`}>
-                  {i < step ? '✓' : i + 1}
-                </div>
-                {i < STEPS.length - 1 && <div className={`step-line ${i < step ? 'done' : ''}`} style={{ flex: 1 }} />}
-              </div>
-            ))}
-          </div>
+            <div className="form-group">
+              <input
+                className="form-control"
+                type="text"
+                placeholder="e.g. 123456"
+                value={otp.join('')}
+                onChange={e => setOtp(e.target.value.split('').slice(0, 6))}
+                autoFocus
+                required
+              />
+            </div>
 
+            <button className="btn btn-primary btn-block btn-lg" disabled={loading}>
+              {loading ? <div className="spinner" /> : '✓ Verify OTP Code →'}
+            </button>
+          </form>
+        )}
 
+        {/* STEP 2: Password & Account Details */}
+        {step === 2 && (
+          <form onSubmit={handleRegisterSubmit}>
+            <h2 className="auth-title">Complete Account Details</h2>
+            <p className="auth-subtitle">Email verified! Create your password and profile details.</p>
 
-          {/* Step 0: Enter Email */}
-          {step === 0 && (
-            <form onSubmit={handleEmailSubmit}>
-              <h2 className="auth-title">Create Patient Account</h2>
-              <p className="auth-subtitle">Enter your email address to receive an OTP verification code</p>
-              <div className="form-group">
-                <label className="form-label">Email Address *</label>
-                <input
-                  className="form-control"
-                  type="email"
-                  placeholder="name@example.com"
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  autoFocus
-                  required
-                />
-              </div>
-              <button className="btn btn-primary btn-block btn-lg" disabled={loading}>
-                {loading ? <div className="spinner" /> : 'Send OTP Code →'}
-              </button>
-              <p className="text-center mt-3" style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-                Already registered?{' '}
-                <Link to="/patient/login" style={{ color: 'var(--primary)', fontWeight: 600 }}>
-                  Login Here
-                </Link>
-              </p>
-            </form>
-          )}
+            <div className="form-group">
+              <label className="form-label">Full Name *</label>
+              <input
+                className="form-control"
+                type="text"
+                placeholder="John Doe"
+                value={name}
+                onChange={e => setName(e.target.value)}
+                required
+              />
+            </div>
 
-          {/* Step 1: Verify OTP */}
-          {step === 1 && (
-            <form onSubmit={handleOtpSubmit}>
-              <h2 className="auth-title">Verify Email Address</h2>
-              <p className="auth-subtitle">Enter the 6-digit OTP code sent to <strong>{email}</strong></p>
-              <div className="otp-inputs">
-                {otp.map((d, i) => (
-                  <input
-                    key={i}
-                    ref={el => (otpRefs.current[i] = el)}
-                    className="otp-input"
-                    type="text"
-                    inputMode="numeric"
-                    value={d}
-                    onChange={e => handleOtpChange(e.target.value, i)}
-                    onKeyDown={e => handleOtpKey(e, i)}
-                  />
-                ))}
-              </div>
-              <button className="btn btn-primary btn-block btn-lg" disabled={loading}>
-                {loading ? <div className="spinner" /> : 'Verify OTP'}
-              </button>
-              <p className="text-center mt-2" style={{ fontSize: 13 }}>
-                <span className="text-muted">Didn't receive code? </span>
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-sm"
-                  disabled={loading || resendTimer > 0}
-                  onClick={handleResendOtp}
-                  style={{ fontWeight: 600 }}
-                >
-                  {resendTimer > 0 ? `Resend OTP in ${resendTimer}s` : '🔄 Resend OTP'}
-                </button>
-              </p>
-            </form>
-          )}
+            <div className="form-group">
+              <label className="form-label">Phone Number *</label>
+              <input
+                className="form-control"
+                type="tel"
+                placeholder="+91 9876543210"
+                value={phone}
+                onChange={e => setPhone(e.target.value)}
+                required
+              />
+            </div>
 
-          {/* Step 2: Patient Registration Details Form */}
-          {step === 2 && (
-            <form onSubmit={handleRegisterSubmit}>
-              <h2 className="auth-title">Complete Registration</h2>
-              <p className="auth-subtitle">Enter your profile details to create your patient account</p>
+            <div className="form-group">
+              <label className="form-label">Age</label>
+              <input
+                className="form-control"
+                type="number"
+                placeholder="30"
+                value={age}
+                onChange={e => setAge(e.target.value)}
+              />
+            </div>
 
-              <div className="form-group">
-                <label className="form-label">Full Name</label>
-                <input
-                  className="form-control"
-                  type="text"
-                  placeholder="e.g. Rahul Sharma"
-                  value={name}
-                  onChange={e => setName(e.target.value)}
-                  autoFocus
-                />
-              </div>
+            <div className="form-group">
+              <label className="form-label">Create Password *</label>
+              <input
+                className="form-control"
+                type="password"
+                placeholder="At least 6 characters"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                required
+              />
+            </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <div className="form-group">
-                  <label className="form-label">Phone Number</label>
-                  <input
-                    className="form-control"
-                    type="tel"
-                    placeholder="9876543210"
-                    value={phone}
-                    onChange={e => setPhone(e.target.value)}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Age</label>
-                  <input
-                    className="form-control"
-                    type="number"
-                    placeholder="e.g. 35"
-                    min="1"
-                    max="120"
-                    value={age}
-                    onChange={e => setAge(e.target.value)}
-                  />
-                </div>
-              </div>
+            <div className="form-group">
+              <label className="form-label">Confirm Password *</label>
+              <input
+                className="form-control"
+                type="password"
+                placeholder="Repeat password"
+                value={confirm}
+                onChange={e => setConfirm(e.target.value)}
+                required
+              />
+            </div>
 
-              <div className="form-group">
-                <label className="form-label">Password *</label>
-                <input
-                  className="form-control"
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  required
-                />
-              </div>
+            <button className="btn btn-primary btn-block btn-lg" disabled={loading}>
+              {loading ? <div className="spinner" /> : '🎉 Create Patient Account →'}
+            </button>
+          </form>
+        )}
 
-              <div className="form-group">
-                <label className="form-label">Confirm Password *</label>
-                <input
-                  className="form-control"
-                  type="password"
-                  placeholder="••••••••"
-                  value={confirm}
-                  onChange={e => setConfirm(e.target.value)}
-                  required
-                />
-              </div>
-
-              <button className="btn btn-primary btn-block btn-lg" disabled={loading}>
-                {loading ? <div className="spinner" /> : 'Create Patient Account'}
-              </button>
-            </form>
-          )}
+        <div style={{ marginTop: 20, textAlign: 'center', fontSize: 14 }}>
+          <span style={{ color: 'var(--text-muted)' }}>Already have a patient account? </span>
+          <Link to="/patient/login" style={{ color: 'var(--primary)', fontWeight: 700 }}>
+            Sign In Here
+          </Link>
         </div>
       </div>
     </div>

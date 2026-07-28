@@ -41,6 +41,10 @@ export const sendOtp = (email, user_type) => requestWithFallback('post', '/send-
 export const verifyOtp = (email, otp) => requestWithFallback('post', '/verify-otp', { email, otp })
 export const resetPassword = (email, otp, new_password, user_type) => requestWithFallback('post', '/reset-password', { email, otp, new_password, user_type })
 
+export const sendVerificationLink = (email, user_type) => requestWithFallback('post', '/send-verification-link', { email, user_type })
+export const verifyEmailToken = (token, email) => requestWithFallback('post', '/verify-email-token', { token, email })
+export const checkEmailVerificationStatus = (email) => requestWithFallback('get', `/check-email-verification-status?email=${encodeURIComponent(email)}`)
+
 // Patient API
 export const checkPatientEmail = email => requestWithFallback('post', '/patient/check-email', { email })
 export const patientRegister = (data, password) => typeof data === 'object' ? requestWithFallback('post', '/patient/register', data) : requestWithFallback('post', '/patient/register', { email: data, password })
