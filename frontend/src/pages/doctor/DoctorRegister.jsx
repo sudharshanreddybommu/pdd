@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { toast } from 'react-toastify'
-import { sendOtp, verifyOtp, doctorRegister } from '../../services/api'
+import { sendVerificationLink, checkEmailVerificationStatus, doctorRegister, sendOtp, verifyOtp } from '../../services/api'
 
 const DOC_TYPES = [
   { key: 'profile_image', label: 'Professional Profile Photo', icon: '👤', required: true },
@@ -12,27 +12,55 @@ const DOC_TYPES = [
 
 export default function DoctorRegister() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+
   const [step, setStep] = useState(0)
   const [email, setEmail] = useState('')
-  const [otp, setOtp] = useState(['', '', '', '', '', ''])
   const [docs, setDocs] = useState({ profile_image: null, hospital_id_doc: null, medical_cert_doc: null, degree_cert_doc: null, payment_qr: null })
   const [docNames, setDocNames] = useState({})
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [fee, setFee] = useState('')
   const [loading, setLoading] = useState(false)
-  const [devOtp, setDevOtp] = useState('')
-  const [resendTimer, setResendTimer] = useState(0)
+  const [waitingForVerification, setWaitingForVerification] = useState(false)
   const [submitted, setSubmitted] = useState(false)
-  const otpRefs = useRef([])
+
+  // OTP Fallback
+  const [useOtpFallback, setUseOtpFallback] = useState(false)
+  const [otp, setOtp] = useState(['', '', '', '', '', ''])
+
   const fileRefs = useRef({})
 
+  // Check URL query parameters if returning from email link click
   useEffect(() => {
-    if (resendTimer > 0) {
-      const timer = setInterval(() => setResendTimer(t => t - 1), 1000)
-      return () => clearInterval(timer)
+    const urlEmail = searchParams.get('email')
+    const urlVerified = searchParams.get('verified')
+    if (urlEmail && urlVerified === 'true') {
+      setEmail(urlEmail)
+      setStep(2)
+      toast.success('Doctor email verified successfully! Upload documents below.')
     }
-  }, [resendTimer])
+  }, [searchParams])
+
+  // Background polling for Email Verification Status
+  useEffect(() => {
+    let interval
+    if (waitingForVerification && email && step === 1) {
+      interval = setInterval(async () => {
+        try {
+          const res = await checkEmailVerificationStatus(email)
+          if (res.data?.verified) {
+            toast.success('🎉 Doctor email verified! Proceeding...')
+            setWaitingForVerification(false)
+            setStep(2)
+          }
+        } catch (err) {
+          console.log('Polling note:', err)
+        }
+      }, 3000)
+    }
+    return () => clearInterval(interval)
+  }, [waitingForVerification, email, step])
 
   const handleFileUpload = (key, file) => {
     if (!file) return
@@ -46,42 +74,32 @@ export default function DoctorRegister() {
 
   const handleEmailSubmit = async e => {
     e.preventDefault()
-    if (!email) return toast.error('Enter your email')
+    if (!email) return toast.error('Enter your email address')
     const emailRegex = /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/
     if (!emailRegex.test(email.trim())) {
-      return toast.error('Please enter a valid email address (e.g. name@gmail.com)')
+      return toast.error('Please enter a valid email address (e.g. doctor@hospital.com)')
     }
     setLoading(true)
     try {
-      await sendOtp(email.trim(), 'doctor')
-      toast.success('OTP sent to your email address!')
+      await sendVerificationLink(email.trim(), 'doctor')
+      toast.success('✉️ Verification link sent to your email! Please check your Gmail inbox / spam folder.')
+      setWaitingForVerification(true)
       setStep(1)
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to send OTP')
+      toast.error(err.response?.data?.error || 'Failed to send verification link')
     } finally {
       setLoading(false)
     }
   }
 
-  const handleOtpChange = (val, idx) => {
-    const next = [...otp]; next[idx] = val.slice(-1); setOtp(next)
-    if (val && idx < 5) otpRefs.current[idx + 1]?.focus()
-  }
-  const handleOtpKey = (e, idx) => {
-    if (e.key === 'Backspace' && !otp[idx] && idx > 0) otpRefs.current[idx - 1]?.focus()
-  }
-
-  const handleResendOtp = async () => {
-    if (!email) return toast.error('Email address is missing')
+  const handleSwitchToOtp = async () => {
     setLoading(true)
     try {
       await sendOtp(email, 'doctor')
-      setOtp(['', '', '', '', '', ''])
-      toast.success('New OTP code sent to your email!')
-      setResendTimer(30)
-      setTimeout(() => otpRefs.current[0]?.focus(), 100)
+      setUseOtpFallback(true)
+      toast.success('6-digit OTP sent to your email address!')
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to resend OTP')
+      toast.error(err.response?.data?.error || 'Failed to send OTP')
     } finally {
       setLoading(false)
     }
@@ -121,153 +139,181 @@ export default function DoctorRegister() {
     }
   }
 
-  if (submitted) return (
-    <div className="page flex-center" style={{ minHeight: '100vh' }}>
-      <div className="auth-card" style={{ maxWidth: 500, textAlign: 'center' }}>
-        <div style={{ fontSize: 72, marginBottom: 20 }}>🎉</div>
-        <h2 style={{ fontSize: 24, fontWeight: 700, marginBottom: 12 }}>Registration Successful!</h2>
-        <p className="text-muted mb-3" style={{ lineHeight: 1.7 }}>
-          Your account has been **auto-verified** for development. You can now set your password and access your dashboard.
-        </p>
-        <div className="alert alert-success mb-3"><span>✅</span><span>Your account is ready for <strong>Login</strong></span></div>
-        <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-          <button onClick={() => navigate('/doctor/login')} className="btn btn-primary">Go to Login</button>
-          <button onClick={() => navigate('/doctor')} className="btn btn-secondary">Back to Home</button>
+  if (submitted) {
+    return (
+      <div className="auth-page fade-in" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', padding: 20 }}>
+        <div className="auth-card" style={{ maxWidth: 480, textAlign: 'center', padding: '40px 30px' }}>
+          <div style={{ fontSize: 56, marginBottom: 16 }}>⏳</div>
+          <h2 style={{ fontSize: 24, fontWeight: 800, marginBottom: 12 }}>Registration Pending Approval</h2>
+          <p style={{ color: 'var(--text-muted)', fontSize: 14, lineHeight: 1.6, marginBottom: 24 }}>
+            Your doctor application has been submitted successfully with all credentials. Our admin medical verification team will review your certificates within 24 hours.
+          </p>
+          <button onClick={() => navigate('/doctor/login')} className="btn btn-primary btn-block btn-lg" style={{ borderRadius: 30 }}>
+            Go to Doctor Login →
+          </button>
         </div>
       </div>
-    </div>
-  )
+    )
+  }
 
   return (
-    <div className="auth-page">
-      <div className="auth-left">
-        <div className="auth-logo"><div className="auth-logo-icon">🦷</div><div className="auth-logo-text">OPMD <span>AI</span></div></div>
-        <h1 className="auth-hero-title">Join Our<br /><span>Medical</span><br />Network</h1>
-        <p className="auth-hero-desc">Register as a verified oral health specialist and help patients detect OPMDs early through AI-assisted diagnosis.</p>
-        <div className="auth-features">
-          {[['📋','Required Documents','Hospital ID, Medical Certificate, Degree Certificate'],
-            ['⏱️','Fast Verification','Admin review within 24-48 hours'],
-            ['🔐','Secure Platform','Your data is encrypted and private'],
-            ['👥','Growing Network','Connect with patients who need your expertise']
-          ].map(([icon, title, desc]) => (
-            <div className="auth-feature" key={title}>
-              <div className="auth-feature-icon">{icon}</div>
-              <div><strong style={{color:'var(--text)'}}>{title}</strong><br /><span style={{fontSize:13}}>{desc}</span></div>
+    <div className="auth-page fade-in">
+      <div className="auth-card" style={{ maxWidth: 520, width: '100%' }}>
+        {/* STEP 0: Email Input */}
+        {step === 0 && (
+          <form onSubmit={handleEmailSubmit}>
+            <div style={{ textAlign: 'center', marginBottom: 20 }}>
+              <span style={{ fontSize: 40 }}>🩺</span>
+              <h2 className="auth-title" style={{ marginTop: 8 }}>Doctor Registration</h2>
+              <p className="auth-subtitle">Enter your medical email to receive a verification link</p>
             </div>
-          ))}
-        </div>
-      </div>
-      <div className="auth-right">
-        <div className="auth-card fade-in">
-          <div className="auth-logo mb-2">
-            <div className="auth-logo-icon" style={{width:40,height:40,fontSize:20}}>👨‍⚕️</div>
-            <span style={{fontWeight:700,fontSize:18}}>Doctor Registration</span>
-          </div>
 
-          {/* Steps */}
-          <div className="step-indicator mb-3">
-            {['Email', 'Verify OTP', 'Documents'].map((s, i) => (
-              <div className="step" key={s} style={{flex:1}}>
-                <div className={`step-dot ${i < step ? 'done' : i === step ? 'active' : 'pending'}`}>{i < step ? '✓' : i + 1}</div>
-                {i < 2 && <div className={`step-line ${i < step ? 'done' : ''}`} style={{flex:1}} />}
+            <div className="form-group">
+              <label className="form-label">Professional Email *</label>
+              <input
+                className="form-control"
+                type="email"
+                placeholder="doctor@hospital.com"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                autoFocus
+                required
+              />
+            </div>
+
+            <button className="btn btn-primary btn-block btn-lg" disabled={loading}>
+              {loading ? <div className="spinner" /> : '✉️ Send Doctor Verification Link →'}
+            </button>
+          </form>
+        )}
+
+        {/* STEP 1: Waiting for Link Click */}
+        {step === 1 && !useOtpFallback && (
+          <div style={{ textAlign: 'center', padding: '10px 0' }}>
+            <div style={{ fontSize: 48, marginBottom: 12 }}>📩</div>
+            <h2 className="auth-title">Check Doctor Email Inbox</h2>
+            <p className="auth-subtitle">
+              Sent verification link to <strong style="color:var(--primary);">{email}</strong>.<br />
+              Open your <strong>Gmail Inbox / Spam folder</strong> and click <strong>"Verify Email"</strong>.
+            </p>
+
+            <div style={{
+              background: 'var(--surface-2)', padding: 16, borderRadius: 12, border: '1px dashed var(--primary)',
+              marginBottom: 20, fontSize: 13, color: 'var(--text-muted)'
+            }}>
+              ⏳ Waiting for email link click... This screen will automatically update as soon as you click the link!
+            </div>
+
+            <div className="spinner" style={{ margin: '0 auto 20px' }} />
+
+            <button type="button" className="btn btn-secondary btn-block" onClick={handleSwitchToOtp} disabled={loading}>
+              🔢 Prefer entering 6-Digit OTP Code instead? Click Here
+            </button>
+          </div>
+        )}
+
+        {/* STEP 1 (Fallback): Enter 6-Digit OTP */}
+        {step === 1 && useOtpFallback && (
+          <form onSubmit={handleOtpSubmit}>
+            <h2 className="auth-title">Enter 6-Digit Doctor OTP</h2>
+            <p className="auth-subtitle">Enter code sent to <strong>{email}</strong></p>
+
+            <div className="form-group">
+              <input
+                className="form-control"
+                type="text"
+                placeholder="e.g. 123456"
+                value={otp.join('')}
+                onChange={e => setOtp(e.target.value.split('').slice(0, 6))}
+                autoFocus
+                required
+              />
+            </div>
+
+            <button className="btn btn-primary btn-block btn-lg" disabled={loading}>
+              {loading ? <div className="spinner" /> : '✓ Verify Doctor OTP →'}
+            </button>
+          </form>
+        )}
+
+        {/* STEP 2: Doctor Documents & Password */}
+        {step === 2 && (
+          <form onSubmit={handleDocSubmit}>
+            <h2 className="auth-title">Doctor Credentials & Profile</h2>
+            <p className="auth-subtitle">Upload required medical certificates and set your password.</p>
+
+            <div className="form-group">
+              <label className="form-label">Consultation Fee (₹) *</label>
+              <input
+                className="form-control"
+                type="number"
+                placeholder="500"
+                value={fee}
+                onChange={e => setFee(e.target.value)}
+                required
+              />
+            </div>
+
+            {DOC_TYPES.map(doc => (
+              <div key={doc.key} className="form-group" style={{ marginBottom: 14 }}>
+                <label className="form-label">
+                  {doc.icon} {doc.label} {doc.required && '*'}
+                </label>
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    style={{ flex: 1, textAlign: 'left', borderRadius: 8, padding: '10px 14px' }}
+                    onClick={() => fileRefs.current[doc.key]?.click()}
+                  >
+                    {docNames[doc.key] ? `✓ ${docNames[doc.key]}` : `📁 Choose ${doc.label}...`}
+                  </button>
+                  <input
+                    type="file"
+                    accept="image/*,.pdf"
+                    ref={el => fileRefs.current[doc.key] = el}
+                    style={{ display: 'none' }}
+                    onChange={e => handleFileUpload(doc.key, e.target.files[0])}
+                  />
+                </div>
               </div>
             ))}
-          </div>
 
-          {step === 0 && (
-            <form onSubmit={handleEmailSubmit}>
-              <h2 className="auth-title">Enter Email</h2>
-              <p className="auth-subtitle">Use your professional/hospital email address</p>
-              <div className="form-group">
-                <label className="form-label">Professional Email</label>
-                <input className="form-control" type="email" placeholder="doctor@hospital.com"
-                  value={email} onChange={e => setEmail(e.target.value)} autoFocus />
-              </div>
-              <button className="btn btn-primary btn-block btn-lg" disabled={loading}>
-                {loading ? <div className="spinner" /> : 'Send OTP →'}
-              </button>
-              <p className="text-center mt-2" style={{fontSize:13}}><Link to="/doctor" style={{color:'var(--primary)'}}>← Back to Landing Page</Link></p>
-            </form>
-          )}
+            <div className="form-group">
+              <label className="form-label">Set Account Password *</label>
+              <input
+                className="form-control"
+                type="password"
+                placeholder="At least 6 characters"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                required
+              />
+            </div>
 
-          {step === 1 && (
-            <form onSubmit={handleOtpSubmit}>
-              <h2 className="auth-title">Verify Email</h2>
-              <p className="auth-subtitle">Enter the OTP sent to <strong>{email}</strong></p>
-              <div className="otp-inputs">
-                {otp.map((d, i) => (
-                  <input key={i} ref={el => otpRefs.current[i] = el} className="otp-input" type="text" inputMode="numeric"
-                    value={d} onChange={e => handleOtpChange(e.target.value, i)} onKeyDown={e => handleOtpKey(e, i)} />
-                ))}
-              </div>
-              <button className="btn btn-primary btn-block btn-lg" disabled={loading}>
-                {loading ? <div className="spinner" /> : 'Verify OTP'}
-              </button>
-              <p className="text-center mt-2" style={{ fontSize: 13 }}>
-                <span className="text-muted">Didn't receive code? </span>
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-sm"
-                  disabled={loading || resendTimer > 0}
-                  onClick={handleResendOtp}
-                  style={{ fontWeight: 600 }}
-                >
-                  {resendTimer > 0 ? `Resend in ${resendTimer}s` : '🔄 Resend OTP'}
-                </button>
-              </p>
-            </form>
-          )}
+            <div className="form-group">
+              <label className="form-label">Confirm Password *</label>
+              <input
+                className="form-control"
+                type="password"
+                placeholder="Repeat password"
+                value={confirm}
+                onChange={e => setConfirm(e.target.value)}
+                required
+              />
+            </div>
 
-          {step === 2 && (
-            <form onSubmit={handleDocSubmit}>
-              <h2 className="auth-title">Upload Documents</h2>
-              <p className="auth-subtitle">Upload verification documents for admin review</p>
-              {DOC_TYPES.map(dt => (
-                <div key={dt.key} className="form-group">
-                  <label className="form-label">{dt.icon} {dt.label} {dt.required && <span style={{color:'var(--danger)'}}>*</span>}</label>
-                  <div onClick={() => fileRefs.current[dt.key]?.click()}
-                    style={{padding:'14px 16px',background:'rgba(255,255,255,0.05)',border:`1px solid ${docs[dt.key] ? 'var(--primary)' : 'var(--glass-border)'}`,borderRadius:'var(--radius-sm)',cursor:'pointer',display:'flex',alignItems:'center',gap:10,transition:'all 0.2s'}}>
-                    <span style={{fontSize:20}}>{docs[dt.key] ? '✅' : '📁'}</span>
-                    <span style={{fontSize:14,color:docs[dt.key] ? 'var(--text)' : 'var(--text-muted)'}}>
-                      {docNames[dt.key] || 'Click to upload file'}
-                    </span>
-                  </div>
-                  <input ref={el => fileRefs.current[dt.key] = el} type="file" accept="image/*,.pdf" style={{display:'none'}}
-                    onChange={e => handleFileUpload(dt.key, e.target.files[0])} />
-                </div>
-              ))}
-              
-              <div className="form-group mt-2">
-                <label className="form-label">Create Password *</label>
-                <input className="form-control" type="password" placeholder="••••••••"
-                  value={password} onChange={e => setPassword(e.target.value)} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Confirm Password *</label>
-                <input className="form-control" type="password" placeholder="••••••••"
-                  value={confirm} onChange={e => setConfirm(e.target.value)} />
-              </div>
+            <button className="btn btn-primary btn-block btn-lg" disabled={loading}>
+              {loading ? <div className="spinner" /> : '🚀 Submit Application for Approval →'}
+            </button>
+          </form>
+        )}
 
-              <div className="form-group mt-2">
-                <label className="form-label">💰 Consultation Fee (₹)</label>
-                <input className="form-control" type="number" placeholder="e.g. 200"
-                  value={fee} onChange={e => setFee(e.target.value)} />
-                <small style={{ color: 'var(--text-muted)', fontSize: 12 }}>Shown to patients to pay via QR.</small>
-              </div>
-
-              <div className="form-group mt-2">
-                <label className="form-label">📱 UPI ID (for dynamic QR payments)</label>
-                <input className="form-control" type="text" placeholder="e.g. 9876543210@ybl"
-                  value={docs.payment_qr || ''} onChange={e => setDocs({ ...docs, payment_qr: e.target.value })} />
-                <small style={{ color: 'var(--text-muted)', fontSize: 12 }}>We will generate a QR code for your patients using this UPI ID and Fee.</small>
-              </div>
-
-              <div className="alert alert-info mb-3"><span>ℹ️</span><span>Accepted: Images (JPG, PNG) and PDF files</span></div>
-              <button className="btn btn-primary btn-block btn-lg" disabled={loading}>
-                {loading ? <div className="spinner" /> : '📤 Submit for Verification'}
-              </button>
-            </form>
-          )}
+        <div style={{ marginTop: 20, textAlign: 'center', fontSize: 14 }}>
+          <span style={{ color: 'var(--text-muted)' }}>Already registered as a Doctor? </span>
+          <Link to="/doctor/login" style={{ color: 'var(--primary)', fontWeight: 700 }}>
+            Sign In Here
+          </Link>
         </div>
       </div>
     </div>

@@ -632,10 +632,6 @@ def ai_predict(left_img_b64, front_img_b64, right_img_b64, symptoms=None):
 
 
 def send_verification_link_via_brevo(to_email, token, user_type="patient"):
-    if not BREVO_API_KEY:
-        print("[BREVO API WARNING] BREVO_API_KEY not configured.")
-        return False, "BREVO_API_KEY missing"
-
     # Frontend base URL (supports local dev + production)
     frontend_host = request.host_url.rstrip('/') if request else "http://localhost:5173"
     if "localhost:5000" in frontend_host or "127.0.0.1:5000" in frontend_host:
@@ -643,81 +639,87 @@ def send_verification_link_via_brevo(to_email, token, user_type="patient"):
     
     verify_url = f"{frontend_host}/verify-email?token={token}&email={urllib.parse.quote(to_email)}&user_type={user_type}"
 
-    url = "https://api.brevo.com/v3/smtp/email"
-    headers = {
-        "accept": "application/json",
-        "api-key": BREVO_API_KEY,
-        "content-type": "application/json"
-    }
-    body = {
-        "sender": {"name": "OralScan AI", "email": EMAIL_USER},
-        "to": [{"email": to_email}],
-        "subject": "✉️ Verify your Email Address — OralScan AI",
-        "textContent": f"Please verify your OralScan AI account by clicking this link: {verify_url}",
-        "htmlContent": f"""
-        <html>
-        <body style="margin:0;padding:0;background:#0f172a;font-family:Arial,sans-serif;">
-          <div style="max-width:520px;margin:40px auto;background:#1e293b;border-radius:16px;overflow:hidden;border:1px solid #334155;">
-            <div style="background:linear-gradient(135deg,#0ea5e9,#6366f1);padding:36px 32px;text-align:center;">
-              <div style="font-size:40px;margin-bottom:8px;">🦷</div>
-              <h1 style="color:#fff;margin:0;font-size:24px;letter-spacing:1px;">OralScan AI</h1>
-              <p style="color:rgba(255,255,255,0.9);margin:6px 0 0;font-size:14px;">OPMD Early Detection Platform</p>
-            </div>
-            <div style="padding:36px 32px;text-align:center;">
-              <h2 style="color:#f1f5f9;margin:0 0 12px;font-size:20px;">Verify Your Email Address</h2>
-              <p style="color:#94a3b8;font-size:14px;margin:0 0 32px;line-height:1.6;">
-                Thank you for registering with OralScan AI. Please click the button below to verify your email address and activate your account.
-              </p>
-              <div style="margin-bottom:32px;">
-                <a href="{verify_url}" target="_blank" style="background:linear-gradient(135deg,#0ea5e9,#6366f1);color:#ffffff;padding:16px 36px;text-decoration:none;border-radius:30px;font-weight:bold;font-size:16px;display:inline-block;box-shadow:0 6px 20px rgba(14,165,233,0.4);">
-                  ✉️ Click Here to Verify Email →
-                </a>
-              </div>
-              <p style="color:#64748b;font-size:12px;margin:0;line-height:1.6;">
-                ⏱️ This verification link is valid for <strong style="color:#f59e0b;">15 minutes</strong>.<br>
-                If the button doesn't work, copy and paste this link in your browser:<br>
-                <a href="{verify_url}" style="color:#0ea5e9;word-break:break-all;">{verify_url}</a>
-              </p>
-            </div>
-            <div style="background:#0f172a;padding:20px 32px;text-align:center;border-top:1px solid #1e293b;">
-              <p style="color:#475569;font-size:11px;margin:0;line-height:1.6;">
-                If you did not create an account with OralScan AI, please ignore this email.<br>
-                © 2026 OralScan AI — AI-Based Early Detection of OPMDs
-              </p>
-            </div>
+    html_content = f"""
+    <html>
+    <body style="margin:0;padding:0;background:#0f172a;font-family:Arial,sans-serif;">
+      <div style="max-width:520px;margin:40px auto;background:#1e293b;border-radius:16px;overflow:hidden;border:1px solid #334155;">
+        <div style="background:linear-gradient(135deg,#0ea5e9,#6366f1);padding:36px 32px;text-align:center;">
+          <div style="font-size:40px;margin-bottom:8px;">🦷</div>
+          <h1 style="color:#fff;margin:0;font-size:24px;letter-spacing:1px;">OralScan AI</h1>
+          <p style="color:rgba(255,255,255,0.9);margin:6px 0 0;font-size:14px;">OPMD Early Detection Platform</p>
+        </div>
+        <div style="padding:36px 32px;text-align:center;">
+          <h2 style="color:#f1f5f9;margin:0 0 12px;font-size:20px;">Verify Your Email Address</h2>
+          <p style="color:#94a3b8;font-size:14px;margin:0 0 32px;line-height:1.6;">
+            Thank you for registering with OralScan AI. Please click the button below to verify your email address and activate your account.
+          </p>
+          <div style="margin-bottom:32px;">
+            <a href="{verify_url}" target="_blank" style="background:linear-gradient(135deg,#0ea5e9,#6366f1);color:#ffffff;padding:16px 36px;text-decoration:none;border-radius:30px;font-weight:bold;font-size:16px;display:inline-block;box-shadow:0 6px 20px rgba(14,165,233,0.4);">
+              ✉️ Click Here to Verify Email →
+            </a>
           </div>
-        </body>
-        </html>
-        """
-    }
-    try:
-        req = urllib.request.Request(url, data=json.dumps(body).encode('utf-8'), headers=headers)
-        with urllib.request.urlopen(req, timeout=10) as response:
-            res_data = response.read().decode('utf-8')
-            parsed = json.loads(res_data) if res_data else {}
-            msg_id = parsed.get("messageId", "N/A")
-            print(f"[VERIFICATION EMAIL SUCCESS] Sent link via Brevo to {to_email} (MessageId: {msg_id})")
-            return True, f"Sent via Brevo (MessageId: {msg_id})"
-    except Exception as brevo_err:
-        print(f"[BREVO VERIFICATION LINK ERROR] {brevo_err}. Attempting SMTP fallback...")
+          <p style="color:#64748b;font-size:12px;margin:0;line-height:1.6;">
+            ⏱️ This verification link is valid for <strong style="color:#f59e0b;">15 minutes</strong>.<br>
+            If the button doesn't work, copy and paste this link in your browser:<br>
+            <a href="{verify_url}" style="color:#0ea5e9;word-break:break-all;">{verify_url}</a>
+          </p>
+        </div>
+        <div style="background:#0f172a;padding:20px 32px;text-align:center;border-top:1px solid #1e293b;">
+          <p style="color:#475569;font-size:11px;margin:0;line-height:1.6;">
+            If you did not create an account with OralScan AI, please ignore this email.<br>
+            © 2026 OralScan AI — AI-Based Early Detection of OPMDs
+          </p>
+        </div>
+      </div>
+    </body>
+    </html>
+    """
 
-    # Fallback to SMTP SSL/TLS
+    # 1. Primary: Send directly via Gmail SMTP SSL (Guarantees instant delivery to exact recipient)
     try:
         msg_obj = MIMEMultipart('alternative')
         msg_obj['From'] = f"OralScan AI <{EMAIL_USER}>"
         msg_obj['To'] = to_email
         msg_obj['Subject'] = "✉️ Verify your Email Address — OralScan AI"
-        msg_obj.attach(MIMEText(body['htmlContent'], 'html'))
+        msg_obj.attach(MIMEText(html_content, 'html'))
         
         server = smtplib.SMTP_SSL(EMAIL_HOST, 465, timeout=10)
         server.login(EMAIL_USER, EMAIL_PASS)
         server.sendmail(EMAIL_USER, to_email, msg_obj.as_string())
         server.quit()
-        print(f"[SMTP VERIFICATION EMAIL SUCCESS] Sent link to {to_email}")
-        return True, "Sent via SMTP SSL"
+        print(f"[SMTP VERIFICATION EMAIL SUCCESS] Direct link delivered to {to_email}")
+        return True, f"Verification link sent directly to {to_email}"
     except Exception as smtp_err:
-        print(f"[SMTP VERIFICATION FALLBACK ERROR] {smtp_err}")
-        return False, str(smtp_err)
+        print(f"[SMTP EMAIL ERROR] {smtp_err}. Attempting Brevo HTTPS fallback...")
+
+    # 2. Secondary Fallback: Brevo HTTPS API
+    if BREVO_API_KEY:
+        try:
+            url = "https://api.brevo.com/v3/smtp/email"
+            headers = {
+                "accept": "application/json",
+                "api-key": BREVO_API_KEY,
+                "content-type": "application/json"
+            }
+            body = {
+                "sender": {"name": "OralScan AI", "email": EMAIL_USER},
+                "to": [{"email": to_email}],
+                "subject": "✉️ Verify your Email Address — OralScan AI",
+                "textContent": f"Please verify your OralScan AI account: {verify_url}",
+                "htmlContent": html_content
+            }
+            req = urllib.request.Request(url, data=json.dumps(body).encode('utf-8'), headers=headers)
+            with urllib.request.urlopen(req, timeout=10) as response:
+                res_data = response.read().decode('utf-8')
+                parsed = json.loads(res_data) if res_data else {}
+                msg_id = parsed.get("messageId", "N/A")
+                print(f"[BREVO VERIFICATION EMAIL SUCCESS] Sent link to {to_email} (MessageId: {msg_id})")
+                return True, f"Sent via Brevo (MessageId: {msg_id})"
+        except Exception as brevo_err:
+            print(f"[BREVO VERIFICATION FALLBACK ERROR] {brevo_err}")
+            return False, str(brevo_err)
+
+    return False, "Failed to send verification email"
 
 
 # ─── AUTH ROUTES ──────────────────────────────────────────────────────────────
