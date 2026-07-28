@@ -6,29 +6,74 @@ import { useLanguage } from '../../utils/i18n'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 
+const LANGUAGES = [
+  { code: 'en', name: 'English', flag: '🇬🇧' },
+  { code: 'te', name: 'తెలుగు', flag: '🇮🇳' },
+  { code: 'hi', name: 'हिंदी', flag: '🇮🇳' },
+  { code: 'ta', name: 'தமிழ்', flag: '🇮🇳' },
+  { code: 'kn', name: 'ಕನ್ನಡ', flag: '🇮🇳' },
+  { code: 'ml', name: 'മലയാളം', flag: '🇮🇳' },
+]
+
 const RISK_CONFIG = {
   low: {
     icon: '✅', color: '#22c55e', label: 'Low Risk', badgeClass: 'risk-low',
-    title: 'Oral Health Looks Good!',
-    titleTe: 'నోటి ఆరోగ్యం బాగుంది!',
-    message: 'No significant lesions detected. Maintain your current oral hygiene routine.',
-    messageTe: 'ఎటువంటి హానికరమైన మార్పులు కనుగొనబడలేదు. రోజూ నోటి పరిశుభ్రత పాటించండి.',
+    title: {
+      en: 'Oral Health Looks Good!',
+      te: 'నోటి ఆరోగ్యం బాగుంది!',
+      hi: 'मौखिक स्वास्थ्य अच्छा लग रहा है!',
+      ta: 'வாய்வழி ఆరోగ్యం நன்றாக உள்ளது!',
+      kn: 'ಬಾಯಿಯ ಆರೋಗ್ಯ ಚೆನ್ನಾಗಿದೆ!',
+      ml: 'വായയുടെ ആരോഗ്യം മികച്ചതാണ്!'
+    },
+    message: {
+      en: 'No significant lesions detected. Maintain your current oral hygiene routine.',
+      te: 'ఎటువంటి హానికరమైన మార్పులు కనుగొనబడలేదు. రోజూ నోటి పరిశుభ్రత పాటించండి.',
+      hi: 'कोई महत्वपूर्ण घाव नहीं मिला। अपनी वर्तमान मौखिक स्वच्छता दिनचर्या बनाए रखें।',
+      ta: 'குறிப்பிடத்தக்க புண்கள் எதுவும் கண்டறியப்படவில்லை. உங்கள் சுகாதார முறையைப் பராமரிக்கவும்.',
+      kn: 'ಯಾವುದೇ ಗಮನಾರ್ಹ ಹುಣ್ಣುಗಳು ಕಂಡುಬಂದಿಲ್ಲ. ದೈನಂದಿನ ನೈರ್ಮಲ್ಯವನ್ನು ಕಾಯ್ದುಕೊಳ್ಳಿ.',
+      ml: 'ഗുരുതരമായ പാടുകളൊന്നും കണ്ടെത്തിയിട്ടില്ല. പതിവ് വായ ശുചിത്വം പാലിക്കുക.'
+    },
     bgColor: 'rgba(34,197,94,0.08)', borderColor: 'rgba(34,197,94,0.3)',
   },
   moderate: {
     icon: '⚠️', color: '#f59e0b', label: 'Moderate Risk', badgeClass: 'risk-moderate',
-    title: 'Early Oral Changes Detected',
-    titleTe: 'నోటి కణజాలంలో ప్రారంభ మార్పులు గుర్తించబడ్డాయి',
-    message: 'Some tissue changes found. Schedule a dentist visit within 2 weeks for evaluation.',
-    messageTe: 'కొన్ని మార్పులు కనిపించాయి. 2 వారాల్లో డెంటిస్ట్ ని కలిసి తనిఖీ చేయించుకోండి.',
+    title: {
+      en: 'Early Oral Changes Detected',
+      te: 'నోటి కణజాలంలో ప్రారంభ మార్పులు గుర్తించబడ్డాయి',
+      hi: 'प्रारंभिक मौखिक परिवर्तन पाए गए',
+      ta: 'ஆரம்பகால வாய்வழி மாற்றங்கள் கண்டறியப்பட்டன',
+      kn: 'ಆರಂಭಿಕ ಬಾಯಿಯ ಬದಲಾವಣೆಗಳು ಕಂಡುಬಂದಿವೆ',
+      ml: 'ആദ്യഘട്ട വായ മാറ്റങ്ങൾ കണ്ടെത്തി'
+    },
+    message: {
+      en: 'Some tissue changes found. Schedule a dentist visit within 2 weeks for evaluation.',
+      te: 'కొన్ని మార్పులు కనిపించాయి. 2 వారాల్లో డెంటిస్ట్ ని కలిసి తనిఖీ చేయించుకోండి.',
+      hi: 'कुछ ऊतक परिवर्तन मिले। मूल्यांकन के लिए 2 सप्ताह के भीतर दंत चिकित्सक से मिलें।',
+      ta: 'சில திசு மாற்றங்கள் காணப்படுகின்றன. 2 வாரங்களுக்குள் பல் மருத்துவரை அணுகவும்.',
+      kn: 'ಕೆಲವು ಬದಲಾವಣೆಗಳು ಕಂಡುಬಂದಿವೆ. 2 ವಾರಗಳ ಒಳಗೆ ವೈದ್ಯರನ್ನು ಭೇಟಿಯಾಗಿ.',
+      ml: 'ചില മാറ്റങ്ങൾ കാണപ്പെടുന്നു. 2 ആഴ്ചയ്ക്കകം ഡോക്ടറെ കാണുക.'
+    },
     bgColor: 'rgba(245,158,11,0.08)', borderColor: 'rgba(245,158,11,0.3)',
   },
   high: {
     icon: '🚨', color: '#ef4444', label: 'High Risk – Urgent', badgeClass: 'risk-high',
-    title: 'Immediate Medical Consultation Required',
-    titleTe: 'తక్షణమే వైద్యుడిని సంప్రదించండి',
-    message: 'High-risk oral indicators detected. Please consult a specialist without delay.',
-    messageTe: 'తీవ్రమైన ప్రమాదకర సంకేతాలు గుర్తించబడ్డాయి. ఆలస్యం చేయకుండా నిపుణులను కలవండి.',
+    title: {
+      en: 'Immediate Medical Consultation Required',
+      te: 'తక్షణమే వైద్యుడిని సంప్రదించండి',
+      hi: 'तत्काल चिकित्सा परामर्श आवश्यक है',
+      ta: 'உடனடி மருத்துவ ஆலோசனை தேவை',
+      kn: 'ತಕ್ಷಣದ ವೈದ್ಯಕೀಯ ಸಮಾಲೋಚನೆ ಅಗತ್ಯವಿದೆ',
+      ml: 'ഉടൻ തന്നെ വൈദ്യസഹായം തേടുക'
+    },
+    message: {
+      en: 'High-risk oral indicators detected. Please consult an oral specialist without delay.',
+      te: 'తీవ్రమైన ప్రమాదకర సంకేతాలు గుర్తించబడ్డాయి. ఆలస్యం చేయకుండా నిపుణులను కలవండి.',
+      hi: 'उच्च जोखिम वाले मौखिक संकेतक मिले। बिना किसी देरी के विशेषज्ञ से सलाह लें।',
+      ta: 'அதிக ஆபத்து அறிகுறிகள் கண்டறியப்பட்டன. தாமதிக்காமல் நிபுணரை அணுகவும்.',
+      kn: 'ಹೆಚ್ಚಿನ ಅಪಾಯದ ಚಿಹ್ನೆಗಳು ಕಂಡುಬಂದಿವೆ. ತಕ್ಷಣವೇ ತಜ್ಞರನ್ನು ಸಂಪರ್ಕಿಸಿ.',
+      ml: 'ഉയർന്ന അപകടസാധ്യത കണ്ടെത്തി. വൈകാതെ തന്നെ വിദഗ്ദ്ധനെ കാണുക.'
+    },
     bgColor: 'rgba(239,68,68,0.08)', borderColor: 'rgba(239,68,68,0.3)',
   },
 }
@@ -47,12 +92,14 @@ function getLevel(confidence) {
 
 export default function PatientResults() {
   const navigate = useNavigate()
-  const { lang, t } = useLanguage()
+  const { lang, changeLanguage, t } = useLanguage()
   const [result, setResult] = useState(null)
   const [scanId, setScanId] = useState(null)
   const [animDone, setAnimDone] = useState(false)
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [activeImageModal, setActiveImageModal] = useState(null)
+  const [showFindingsModal, setShowFindingsModal] = useState(false)
+  const [showRecsModal, setShowRecsModal] = useState(false)
 
   useEffect(() => {
     const data = sessionStorage.getItem('scanResult')
@@ -74,7 +121,11 @@ export default function PatientResults() {
   const diseases = result.detected_diseases || []
   const detected = diseases.filter(d => d.confidence >= 50)
 
-  /* 🔊 Voice Audio Report Reader (Text-To-Speech) */
+  // Dynamic Translated Titles & Messages
+  const displayTitle = cfg.title[lang] || cfg.title.en
+  const displayMessage = cfg.message[lang] || cfg.message.en
+
+  /* 🔊 Voice Audio Report Reader (Text-To-Speech in Selected Language) */
   const toggleSpeech = () => {
     if (!('speechSynthesis' in window)) {
       alert('Text-to-speech is not supported on this browser.')
@@ -87,12 +138,11 @@ export default function PatientResults() {
       return
     }
 
-    const reportText = lang === 'te'
-      ? `ఓరల్ స్కాన్ ఏఐ విశ్లేషణ నివేదిక. స్థితి: ${cfg.label}. ఫలితం: ${result.prediction}. వైద్య సూచనలు: ${(result.suggestions || []).join('. ')}`
-      : `Oral Scan A I Analysis Report. Status: ${cfg.label}. Findings: ${result.prediction}. Recommendations: ${(result.suggestions || []).join('. ')}`
+    const langCodes = { en: 'en-US', te: 'te-IN', hi: 'hi-IN', ta: 'ta-IN', kn: 'kn-IN', ml: 'ml-IN' }
+    const reportText = `${t('resultsTitle')}. ${cfg.label}. ${displayTitle}. ${displayMessage}.`
 
     const utterance = new SpeechSynthesisUtterance(reportText)
-    utterance.lang = lang === 'te' ? 'te-IN' : 'en-US'
+    utterance.lang = langCodes[lang] || 'en-US'
     utterance.rate = 0.9
 
     utterance.onend = () => setIsSpeaking(false)
@@ -105,13 +155,55 @@ export default function PatientResults() {
   const openReport = () => {
     if (scanId) {
       window.open(`${API_URL}/api/scan/${scanId}/report`, '_blank')
+    } else {
+      setShowFindingsModal(true)
     }
   }
 
   return (
     <div className="page fade-in">
       <PatientNavbar />
-      <div className="container" style={{ maxWidth: 880, paddingTop: 40, paddingBottom: 60 }}>
+      <div className="container" style={{ maxWidth: 900, paddingTop: 30, paddingBottom: 60 }}>
+
+        {/* 🌐 Top Multi-Language Selection Toolbar */}
+        <div className="card mb-3" style={{
+          background: 'linear-gradient(135deg, rgba(14,165,233,0.12), rgba(99,102,241,0.12))',
+          border: '1px solid var(--primary)',
+          padding: '16px 20px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 20 }}>🌐</span>
+              <strong style={{ fontSize: 14 }}>Select Report Reading Language (భాషను ఎంచుకోండి):</strong>
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {LANGUAGES.map(l => (
+                <button
+                  key={l.code}
+                  onClick={() => changeLanguage(l.code)}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: 20,
+                    border: lang === l.code ? '2px solid var(--primary)' : '1px solid var(--border)',
+                    background: lang === l.code ? 'var(--primary)' : 'var(--surface-1)',
+                    color: lang === l.code ? '#fff' : 'var(--text)',
+                    fontWeight: lang === l.code ? 800 : 600,
+                    fontSize: 13,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    boxShadow: lang === l.code ? '0 2px 10px rgba(14,165,233,0.4)' : 'none',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <span>{l.flag}</span>
+                  <span>{l.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
 
         {/* Header Title */}
         <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
@@ -128,7 +220,7 @@ export default function PatientResults() {
               color: '#fff',
               border: 'none',
               borderRadius: 30,
-              padding: '10px 20px',
+              padding: '10px 22px',
               fontSize: 14,
               fontWeight: 700,
               cursor: 'pointer',
@@ -157,10 +249,10 @@ export default function PatientResults() {
             {cfg.label}
           </div>
           <h2 style={{ fontSize: 24, fontWeight: 700, marginBottom: 10 }}>
-            {lang === 'te' ? cfg.titleTe : cfg.title}
+            {displayTitle}
           </h2>
-          <p style={{ color: 'var(--text-muted)', fontSize: 15, maxWidth: 520, margin: '0 auto 24px', lineHeight: 1.7 }}>
-            {lang === 'te' ? cfg.messageTe : cfg.message}
+          <p style={{ color: 'var(--text-muted)', fontSize: 15, maxWidth: 540, margin: '0 auto 24px', lineHeight: 1.7 }}>
+            {displayMessage}
           </p>
 
           {/* Stats Row */}
@@ -190,7 +282,7 @@ export default function PatientResults() {
           </p>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
-            {['left_image', 'front_image', 'right_image'].map((key, i) => {
+            {['left_image', 'front_image', 'right_image'].map((key) => {
               const imgData = result[key] || result.left_image || result.front_image || result.right_image
               const label = key === 'left_image' ? 'Left View' : key === 'front_image' ? 'Front View' : 'Right View'
               if (!imgData) return null
@@ -254,13 +346,24 @@ export default function PatientResults() {
           </div>
         </div>
 
-        {/* ── AI Diagnostic Findings ── */}
-        <div className="card mb-3">
-          <h3 className="card-title mb-2">🔬 {t('findingsTitle')}</h3>
-          <p style={{ color: 'var(--text-muted)', fontSize: 15, lineHeight: 1.75 }}>{result.prediction}</p>
+        {/* ── 🔬 AI Diagnostic Findings File Card ── */}
+        <div className="card mb-3" style={{ borderLeft: '5px solid var(--primary)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 12 }}>
+            <h3 className="card-title" style={{ margin: 0 }}>{t('findingsTitle')}</h3>
+            <button
+              onClick={() => setShowFindingsModal(true)}
+              className="btn btn-primary btn-sm"
+              style={{ background: 'linear-gradient(135deg, #0ea5e9, #6366f1)', border: 'none' }}
+            >
+              {t('openReportModal')} →
+            </button>
+          </div>
+          <p style={{ color: 'var(--text)', fontSize: 15, lineHeight: 1.75, background: 'var(--surface-2)', padding: '16px 20px', borderRadius: 12, border: '1px solid var(--border)' }}>
+            {result.prediction}
+          </p>
         </div>
 
-        {/* ── Condition Probability Breakdown ── */}
+        {/* ── 🦠 Condition Probability Breakdown ── */}
         {diseases.length > 0 && (
           <div className="card mb-3">
             <h3 className="card-title mb-1">🦠 {t('breakdownTitle')}</h3>
@@ -273,7 +376,6 @@ export default function PatientResults() {
                 const lv = getLevel(d.confidence)
                 const palette = DISEASE_COLORS[lv]
                 const isDetected = d.confidence >= 50
-                const diseaseName = (lang === 'te' && t(d.name.toLowerCase().replace(/ /g, '_'))) ? t(d.name.toLowerCase().replace(/ /g, '_')) : d.name
 
                 return (
                   <div key={i} style={{
@@ -285,7 +387,7 @@ export default function PatientResults() {
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <span style={{ fontSize: 18 }}>{isDetected ? '🔴' : '🟢'}</span>
-                        <span style={{ fontWeight: 700, fontSize: 14 }}>{diseaseName}</span>
+                        <span style={{ fontWeight: 700, fontSize: 14 }}>{d.name}</span>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <span style={{
@@ -314,14 +416,23 @@ export default function PatientResults() {
           </div>
         )}
 
-        {/* ── Clinical Recommendations ── */}
-        <div className="card mb-3">
-          <h3 className="card-title mb-1">💡 {t('recommendationsTitle')}</h3>
+        {/* ── 💡 Clinical Recommendations File Card ── */}
+        <div className="card mb-3" style={{ borderLeft: '5px solid #6366f1' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 12 }}>
+            <h3 className="card-title" style={{ margin: 0 }}>{t('recommendationsTitle')}</h3>
+            <button
+              onClick={() => setShowRecsModal(true)}
+              className="btn btn-secondary btn-sm"
+              style={{ border: '1px solid var(--accent, #6366f1)', color: 'var(--accent, #6366f1)' }}
+            >
+              {t('openRecModal')} →
+            </button>
+          </div>
           <ul className="suggestions-list" style={{ marginTop: 12 }}>
             {(result.suggestions || []).map((s, i) => (
               <li key={i} className="suggestion-item">
                 <div className="suggestion-dot" style={{ background: cfg.color }} />
-                <span>{s}</span>
+                <span style={{ fontSize: 15, lineHeight: 1.6 }}>{s}</span>
               </li>
             ))}
           </ul>
@@ -352,21 +463,144 @@ export default function PatientResults() {
           <button onClick={() => navigate('/patient/home')} className="btn btn-secondary">
             🏠 {t('home')}
           </button>
-          {scanId && (
-            <button
-              onClick={openReport}
-              className="btn btn-primary"
-              style={{
-                background: 'linear-gradient(135deg, #6366f1, #0ea5e9)',
-                border: 'none',
-                display: 'flex', alignItems: 'center', gap: 8,
-              }}
-            >
-              📄 {t('downloadReport')}
-            </button>
-          )}
+          <button
+            onClick={openReport}
+            className="btn btn-primary"
+            style={{
+              background: 'linear-gradient(135deg, #6366f1, #0ea5e9)',
+              border: 'none',
+              display: 'flex', alignItems: 'center', gap: 8,
+            }}
+          >
+            📄 {t('downloadReport')}
+          </button>
         </div>
       </div>
+
+      {/* 📄 MODAL 1: Full AI Diagnostic Findings Document Reader */}
+      {showFindingsModal && (
+        <div
+          onClick={() => setShowFindingsModal(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.85)',
+            zIndex: 99999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 20
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: 'var(--surface-1, #0f172a)',
+              borderRadius: 20,
+              padding: 28,
+              maxWidth: 650,
+              width: '100%',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              border: '1px solid var(--primary)',
+              boxShadow: '0 20px 50px rgba(0,0,0,0.5)'
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', paddingBottom: 16, marginBottom: 20 }}>
+              <div>
+                <h2 style={{ fontSize: 20, margin: 0 }}>📄 Official AI Diagnostic Findings Report</h2>
+                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Language: {LANGUAGES.find(l => l.code === lang)?.name} ({lang.toUpperCase()})</span>
+              </div>
+              <button onClick={() => setShowFindingsModal(false)} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: 'var(--text)' }}>✕</button>
+            </div>
+
+            <div style={{ lineHeight: 1.8, fontSize: 15, color: 'var(--text)' }}>
+              <div style={{ padding: 16, background: 'var(--surface-2)', borderRadius: 12, marginBottom: 16, borderLeft: `4px solid ${cfg.color}` }}>
+                <strong>Assessment Status:</strong> {cfg.label} ({displayTitle})<br />
+                <strong>Confidence Score:</strong> {result.confidence}%<br />
+                <strong>Scan Date:</strong> {new Date().toLocaleDateString()}
+              </div>
+
+              <h4 style={{ color: 'var(--primary)', marginBottom: 8 }}>🔬 Clinical Diagnosis Summary:</h4>
+              <p>{result.prediction}</p>
+
+              <h4 style={{ color: 'var(--primary)', marginTop: 20, marginBottom: 8 }}>🦠 Lesion Class Breakdown:</h4>
+              <ul>
+                {diseases.map((d, i) => (
+                  <li key={i}>
+                    <strong>{d.name}:</strong> {d.confidence}% — {d.confidence >= 50 ? '🔴 Detected' : '🟢 Normal'}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div style={{ marginTop: 24, textAlign: 'right' }}>
+              <button className="btn btn-secondary" onClick={() => setShowFindingsModal(false)}>Close Document</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 💡 MODAL 2: Clinical Recommendations & Care Guidelines Reader */}
+      {showRecsModal && (
+        <div
+          onClick={() => setShowRecsModal(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.85)',
+            zIndex: 99999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 20
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: 'var(--surface-1, #0f172a)',
+              borderRadius: 20,
+              padding: 28,
+              maxWidth: 650,
+              width: '100%',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              border: '1px solid var(--accent, #6366f1)',
+              boxShadow: '0 20px 50px rgba(0,0,0,0.5)'
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', paddingBottom: 16, marginBottom: 20 }}>
+              <div>
+                <h2 style={{ fontSize: 20, margin: 0 }}>💡 Clinical Treatment Guidelines & Recommendations</h2>
+                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Language: {LANGUAGES.find(l => l.code === lang)?.name} ({lang.toUpperCase()})</span>
+              </div>
+              <button onClick={() => setShowRecsModal(false)} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: 'var(--text)' }}>✕</button>
+            </div>
+
+            <div style={{ lineHeight: 1.8, fontSize: 15, color: 'var(--text)' }}>
+              <h4 style={{ color: 'var(--accent, #6366f1)', marginBottom: 12 }}>📋 Recommended Actions:</h4>
+              <ol style={{ paddingLeft: 20 }}>
+                {(result.suggestions || []).map((s, i) => (
+                  <li key={i} style={{ marginBottom: 10 }}>{s}</li>
+                ))}
+              </ol>
+
+              <div style={{ marginTop: 20, padding: 16, background: 'rgba(239,68,68,0.1)', borderRadius: 12, border: '1px solid rgba(239,68,68,0.3)' }}>
+                <strong style={{ color: '#ef4444' }}>⚠️ Medical Disclaimer:</strong>
+                <p style={{ margin: '6px 0 0', fontSize: 13 }}>
+                  This AI diagnostic analysis is intended for early screening support only. Always consult a qualified dental oncologist or oral surgeon for clinical biopsy and final medical diagnosis.
+                </p>
+              </div>
+            </div>
+
+            <div style={{ marginTop: 24, textAlign: 'right', display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+              <button className="btn btn-danger" onClick={() => { setShowRecsModal(false); navigate('/patient/doctors'); }}>🏥 Book Doctor Consultation</button>
+              <button className="btn btn-secondary" onClick={() => setShowRecsModal(false)}>Close Guidelines</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 🔴 Modal Inspector for AI Image Overlay */}
       {activeImageModal && (
