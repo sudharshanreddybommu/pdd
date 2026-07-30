@@ -675,24 +675,7 @@ def send_verification_link_via_brevo(to_email, token, user_type="patient"):
     </html>
     """
 
-    # 1. Primary: Send directly via Gmail SMTP SSL (Guarantees instant delivery to exact recipient)
-    try:
-        msg_obj = MIMEMultipart('alternative')
-        msg_obj['From'] = f"OralScan AI <{EMAIL_USER}>"
-        msg_obj['To'] = to_email
-        msg_obj['Subject'] = "✉️ Verify your Email Address — OralScan AI"
-        msg_obj.attach(MIMEText(html_content, 'html'))
-        
-        server = smtplib.SMTP_SSL(EMAIL_HOST, 465, timeout=10)
-        server.login(EMAIL_USER, EMAIL_PASS)
-        server.sendmail(EMAIL_USER, to_email, msg_obj.as_string())
-        server.quit()
-        print(f"[SMTP VERIFICATION EMAIL SUCCESS] Direct link delivered to {to_email}")
-        return True, f"Verification link sent directly to {to_email}"
-    except Exception as smtp_err:
-        print(f"[SMTP EMAIL ERROR] {smtp_err}. Attempting Brevo HTTPS fallback...")
-
-    # 2. Secondary Fallback: Brevo HTTPS API
+    # 1. Primary Sender: Brevo HTTPS API (Instant delivery on Port 443 over HTTPS)
     if BREVO_API_KEY:
         try:
             url = "https://api.brevo.com/v3/smtp/email"
@@ -714,12 +697,27 @@ def send_verification_link_via_brevo(to_email, token, user_type="patient"):
                 parsed = json.loads(res_data) if res_data else {}
                 msg_id = parsed.get("messageId", "N/A")
                 print(f"[BREVO VERIFICATION EMAIL SUCCESS] Sent link to {to_email} (MessageId: {msg_id})")
-                return True, f"Sent via Brevo (MessageId: {msg_id})"
+                return True, f"Verification link sent to {to_email} (MessageId: {msg_id})"
         except Exception as brevo_err:
-            print(f"[BREVO VERIFICATION FALLBACK ERROR] {brevo_err}")
-            return False, str(brevo_err)
+            print(f"[BREVO API ERROR] {brevo_err}. Attempting SMTP fallback...")
 
-    return False, "Failed to send verification email"
+    # 2. Fallback: SMTP SSL
+    try:
+        msg_obj = MIMEMultipart('alternative')
+        msg_obj['From'] = f"OralScan AI <{EMAIL_USER}>"
+        msg_obj['To'] = to_email
+        msg_obj['Subject'] = "✉️ Verify your Email Address — OralScan AI"
+        msg_obj.attach(MIMEText(html_content, 'html'))
+        
+        server = smtplib.SMTP_SSL(EMAIL_HOST, 465, timeout=3)
+        server.login(EMAIL_USER, EMAIL_PASS)
+        server.sendmail(EMAIL_USER, to_email, msg_obj.as_string())
+        server.quit()
+        print(f"[SMTP VERIFICATION EMAIL SUCCESS] Direct link delivered to {to_email}")
+        return True, f"Verification link sent to {to_email}"
+    except Exception as smtp_err:
+        print(f"[SMTP EMAIL ERROR] {smtp_err}")
+        return False, str(smtp_err)
 
 
 # ─── AUTH ROUTES ──────────────────────────────────────────────────────────────
