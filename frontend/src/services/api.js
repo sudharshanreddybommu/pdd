@@ -1,8 +1,9 @@
 import axios from 'axios'
 import { executeLocalFallback } from './localEngine'
 
-const isLocalDev = window.location.hostname === 'localhost' && (window.location.port === '5173' || window.location.port === '3000' || window.location.port === '5174');
-const API_URL = isLocalDev ? 'http://localhost:5000' : 'https://oralscan-backend-gmup.onrender.com';
+const hostname = window.location.hostname;
+const isLocalHost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.168.') || hostname.startsWith('10.');
+const API_URL = isLocalHost ? 'http://localhost:5000' : 'https://oralscan-backend-gmup.onrender.com';
 
 const API = axios.create({ 
   baseURL: API_URL,
@@ -29,7 +30,7 @@ const requestWithFallback = async (method, url, data = null) => {
     else if (method === 'delete') res = await API.delete(url);
     return res;
   } catch (err) {
-    if (url.includes('otp')) {
+    if (url.includes('otp') || url.includes('verification') || url.includes('verify')) {
       throw err;
     }
     console.warn(`Cloud API (${url}) unreachable/sleeping. Activating local engine fallback...`, err);
