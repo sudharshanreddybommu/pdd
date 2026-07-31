@@ -101,7 +101,7 @@ export default function PatientRegister() {
           localStorage.setItem('patientData', JSON.stringify(res.data.patient))
         }
       }
-      navigate('/patient/dashboard')
+      navigate('/patient/home')
     } catch (err) {
       toast.error(err.response?.data?.error || 'Registration failed')
     } finally {
