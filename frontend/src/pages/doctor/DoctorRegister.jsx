@@ -205,63 +205,107 @@ export default function DoctorRegister() {
           </form>
         )}
 
-        {/* STEP 1: Waiting for Link Click */}
-        {step === 1 && !useOtpFallback && (
-          <div style={{ textAlign: 'center', padding: '10px 0' }}>
-            <div style={{ fontSize: 48, marginBottom: 12 }}>📩</div>
-            <h2 className="auth-title">Check Doctor Email Inbox</h2>
-            <p className="auth-subtitle">
-              Sent verification link to <strong style="color:var(--primary);">{email}</strong>.<br />
-              Open your <strong>Gmail Inbox / Spam folder</strong> and click <strong>"Verify Email"</strong>.
+        {/* STEP 1: Doctor Email Verification — Dual Options (Link Click OR 6-Digit OTP Input) */}
+        {step === 1 && (
+          <div style={{ textAlign: 'center', padding: '5px 0' }}>
+            <div style={{ fontSize: 40, marginBottom: 6 }}>📩</div>
+            <h2 className="auth-title">Verify Doctor Email</h2>
+            <p className="auth-subtitle" style={{ marginBottom: 16 }}>
+              Sent verification link & 6-digit OTP code to <strong style={{ color: 'var(--primary)' }}>{email}</strong>
             </p>
 
+            {/* OPTION 1: 1-Click Email Link */}
             <div style={{
-              background: 'var(--surface-2)', padding: 16, borderRadius: 12, border: '1px dashed var(--primary)',
-              marginBottom: 20, fontSize: 13, color: 'var(--text-muted)'
+              background: 'rgba(14,165,233,0.08)', padding: 16, borderRadius: 14, border: '1px solid rgba(14,165,233,0.25)',
+              marginBottom: 16, textAlign: 'left'
             }}>
-              ⏳ Waiting for email link click... This screen will automatically update as soon as you click the link!
+              <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--primary)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span>✉️</span> Option 1: 1-Click Email Link
+              </div>
+              <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '0 0 10px', lineHeight: 1.4 }}>
+                Open <strong>Gmail Inbox / Spam folder</strong>, click <strong>"Verify Email"</strong>, then tap below:
+              </p>
+              <button
+                type="button"
+                className="btn btn-block"
+                onClick={handleManualCheck}
+                disabled={loading}
+                style={{ background: 'linear-gradient(135deg, #10b981, #059669)', color: '#fff', fontWeight: 700, border: 'none', borderRadius: 10, padding: '11px', fontSize: 14 }}
+              >
+                {loading ? <div className="spinner" /> : '✓ Clicked Email Link? Proceed to Account Setup →'}
+              </button>
             </div>
 
-            <div className="spinner" style={{ margin: '0 auto 20px' }} />
+            <div style={{ display: 'flex', alignItems: 'center', margin: '14px 0', color: 'var(--text-muted)', fontSize: 11, fontWeight: 700 }}>
+              <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+              <span style={{ padding: '0 10px', letterSpacing: 1 }}>OR ENTER 6-DIGIT OTP</span>
+              <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+            </div>
+
+            {/* OPTION 2: Enter 6-Digit OTP Code */}
+            <form onSubmit={handleOtpSubmit} style={{
+              background: 'var(--surface-2)', padding: 16, borderRadius: 14, border: '1px solid var(--border)',
+              textAlign: 'left'
+            }}>
+              <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span>🔢</span> Option 2: Enter 6-Digit OTP Code
+              </div>
+              <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '0 0 10px' }}>
+                Enter the 6-digit code shown in your email:
+              </p>
+
+              <div style={{ display: 'flex', gap: 6, justifyContent: 'center', marginBottom: 12 }}>
+                {otp.map((digit, idx) => (
+                  <input
+                    key={idx}
+                    id={`doctor-otp-input-${idx}`}
+                    type="text"
+                    maxLength="1"
+                    className="form-control"
+                    style={{
+                      width: 40, height: 46, textAlign: 'center', fontSize: 18, fontWeight: 800,
+                      borderRadius: 8, border: '2px solid var(--border)', padding: 0
+                    }}
+                    value={digit}
+                    onChange={e => {
+                      const val = e.target.value.replace(/[^0-9]/g, '')
+                      const newOtp = [...otp]
+                      newOtp[idx] = val
+                      setOtp(newOtp)
+                      if (val && idx < 5) {
+                        const nextEl = document.getElementById(`doctor-otp-input-${idx + 1}`)
+                        if (nextEl) nextEl.focus()
+                      }
+                    }}
+                    onKeyDown={e => {
+                      if (e.key === 'Backspace' && !otp[idx] && idx > 0) {
+                        const prevEl = document.getElementById(`doctor-otp-input-${idx - 1}`)
+                        if (prevEl) prevEl.focus()
+                      }
+                    }}
+                  />
+                ))}
+              </div>
+
+              <button
+                type="submit"
+                className="btn btn-primary btn-block"
+                disabled={loading || otp.join('').length < 6}
+                style={{ fontWeight: 700, borderRadius: 10, padding: '11px', fontSize: 14 }}
+              >
+                {loading ? <div className="spinner" /> : '✓ Verify OTP Code & Proceed →'}
+              </button>
+            </form>
 
             <button
               type="button"
-              className="btn btn-block btn-lg mb-3"
-              onClick={handleManualCheck}
-              disabled={loading}
-              style={{ background: 'linear-gradient(135deg, #10b981, #059669)', color: '#fff', fontWeight: 'bold', border: 'none', boxShadow: '0 4px 14px rgba(16,185,129,0.4)' }}
+              className="btn btn-link btn-block mt-2"
+              onClick={() => setStep(0)}
+              style={{ fontSize: 13 }}
             >
-              {loading ? <div className="spinner" /> : '✓ I Have Clicked Email Link — Proceed to Account Setup →'}
-            </button>
-
-            <button type="button" className="btn btn-secondary btn-block" onClick={handleSwitchToOtp} disabled={loading}>
-              🔢 Prefer entering 6-Digit OTP Code instead? Click Here
+              ← Change Email Address
             </button>
           </div>
-        )}
-
-        {/* STEP 1 (Fallback): Enter 6-Digit OTP */}
-        {step === 1 && useOtpFallback && (
-          <form onSubmit={handleOtpSubmit}>
-            <h2 className="auth-title">Enter 6-Digit Doctor OTP</h2>
-            <p className="auth-subtitle">Enter code sent to <strong>{email}</strong></p>
-
-            <div className="form-group">
-              <input
-                className="form-control"
-                type="text"
-                placeholder="e.g. 123456"
-                value={otp.join('')}
-                onChange={e => setOtp(e.target.value.split('').slice(0, 6))}
-                autoFocus
-                required
-              />
-            </div>
-
-            <button className="btn btn-primary btn-block btn-lg" disabled={loading}>
-              {loading ? <div className="spinner" /> : '✓ Verify Doctor OTP →'}
-            </button>
-          </form>
         )}
 
         {/* STEP 2: Doctor Documents & Password */}
