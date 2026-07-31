@@ -547,22 +547,27 @@ def ai_predict(left_img_b64, front_img_b64, right_img_b64, symptoms=None):
 
     score = min(100, max(0, round(score + delta, 1)))
 
-    # Calculate dynamic relative probabilities for each class based on exact symptom matrix
+    # Calculate dynamic relative probabilities for each class based on exact symptom matrix & ML model
     has_white = bool(symptoms and symptoms.get('white_patch'))
     has_red = bool(symptoms and symptoms.get('red_patch'))
     has_ulcer = bool(symptoms and symptoms.get('mouth_ulcer'))
     has_burning = bool(symptoms and symptoms.get('burning_sensation'))
     has_swallow = bool(symptoms and symptoms.get('swallowing'))
+    has_pain = bool(symptoms and symptoms.get('mouth_pain'))
     has_tobacco = bool(symptoms and (symptoms.get('tobacco') or symptoms.get('smoking')))
+    has_alcohol = bool(symptoms and symptoms.get('alcohol'))
 
-    white_patch_prob = round(min(96, max(3, (82.5 if has_white else 4.0) + (10 if has_tobacco else 0) + delta)), 1)
-    ulcer_prob = round(min(96, max(3, (84.0 if has_ulcer else 5.0) + (8 if symptoms and symptoms.get('mouth_pain') else 0) + delta)), 1)
-    leukoplakia_prob = round(min(96, max(2, (88.0 if (has_white and has_tobacco) else (55.0 if has_white else 3.0)) + delta)), 1)
-    erythroplakia_prob = round(min(96, max(2, (89.0 if has_red else 2.5) + delta)), 1)
-    osmf_prob = round(min(96, max(1, (91.0 if (has_burning and has_swallow and has_tobacco) else (62.0 if (has_burning and has_swallow) else 2.0)) + delta)), 1)
-    lichen_planus_prob = round(min(96, max(2, (76.0 if (has_burning and has_white) else 2.0) + delta)), 1)
-    suspicious_prob = round(min(96, max(1, (78.0 if (has_ulcer and score > 50) else (15.0 if score > 35 else 2.0)) + delta)), 1)
-    cancer_prob = round(min(96, max(1, (82.0 if (score > 65 and (has_red or has_swallow)) else (12.0 if score > 50 else 1.0)) + delta)), 1)
+    white_patch_prob = round(min(96.5, max(3.5, (82.5 if has_white else 4.0) + (8.0 if has_tobacco else 0.0) + delta)), 1)
+    ulcer_prob = round(min(96.5, max(3.0, (84.0 if has_ulcer else 5.0) + (7.0 if has_pain else 0.0) + delta)), 1)
+    leukoplakia_prob = round(min(96.5, max(2.5, (88.5 if (has_white and has_tobacco) else (64.0 if has_white else 3.0)) + delta)), 1)
+    erythroplakia_prob = round(min(96.5, max(2.5, (89.5 if has_red else 2.5) + (5.0 if has_pain else 0.0) + delta)), 1)
+    osmf_prob = round(min(96.5, max(1.5, (91.5 if (has_burning and has_swallow and has_tobacco) else (66.0 if (has_burning and has_swallow) else (42.0 if has_burning else 2.0))) + delta)), 1)
+    lichen_planus_prob = round(min(96.5, max(2.0, (78.0 if (has_burning and has_white) else 2.0) + delta)), 1)
+    suspicious_prob = round(min(96.5, max(1.5, (79.0 if (has_ulcer and score > 50) else (18.0 if score > 35 else 2.0)) + delta)), 1)
+    cancer_prob = round(min(96.5, max(1.0, (84.0 if (score > 65 and (has_red or has_swallow or has_ulcer)) else (14.0 if score > 50 else 1.0)) + delta)), 1)
+
+    all_disorder_probs = [leukoplakia_prob, erythroplakia_prob, osmf_prob, lichen_planus_prob, ulcer_prob, white_patch_prob, suspicious_prob, cancer_prob]
+    max_disorder_prob = max(all_disorder_probs)
 
     # Detailed clinical narrative tailored to diagnosis
     if score < 35:
@@ -574,21 +579,24 @@ def ai_predict(left_img_b64, front_img_b64, right_img_b64, symptoms=None):
             "Stay well hydrated by drinking 8–10 glasses of water daily",
             "Schedule a routine preventive oral health screening every 6 months"
         ]
-        confidence = round(min(98.5, max(85.0, 92.0 + delta)), 1)
+        confidence = round(min(98.5, max(75.0, 94.0 - (score * 0.4) + delta)), 1)
     elif score < 65:
         risk_level = "moderate"
         if has_white:
             prediction = "Moderate-risk oral indicators detected. Visual analysis and reported symptoms show prominent white mucosal hyperkeratotic patches consistent with early Leukoplakia. Clinical evaluation is strongly recommended."
-            confidence = round(min(92.0, max(74.0, 78.5 + (10 if has_tobacco else 0) + delta)), 1)
+            confidence = leukoplakia_prob
         elif has_red:
             prediction = "Moderate-risk oral indicators detected. Visual analysis highlights reddish erythematous mucosal changes consistent with early Erythroplakia. Prompt dental clinical examination is advised."
-            confidence = round(min(94.0, max(76.0, 84.0 + delta)), 1)
+            confidence = erythroplakia_prob
         elif has_burning and has_swallow:
             prediction = "Moderate-risk oral indicators detected. Reported mucosal burning and restricted mouth opening suggest early Oral Submucous Fibrosis (OSMF). Tobacco cessation and clinical therapy are recommended."
-            confidence = round(min(95.0, max(78.0, 86.5 + delta)), 1)
+            confidence = osmf_prob
+        elif has_ulcer:
+            prediction = "Moderate-risk oral lesion detected. Visual inspection and symptoms indicate a persistent oral ulcer requiring dental evaluation."
+            confidence = ulcer_prob
         else:
             prediction = "Moderate-risk early oral tissue changes and mucosal lesions identified. Clinical evaluation by a qualified dentist within 2 weeks is recommended to prevent progression."
-            confidence = round(min(88.0, max(70.0, 75.0 + delta)), 1)
+            confidence = round(min(89.0, max(62.0, max_disorder_prob + delta)), 1)
 
         suggestions = [
             "Schedule a clinical consultation with a qualified dentist or oral physician within 2 weeks",
@@ -600,10 +608,10 @@ def ai_predict(left_img_b64, front_img_b64, right_img_b64, symptoms=None):
         risk_level = "high"
         if has_red or has_swallow or has_ulcer:
             prediction = "High-risk severe oral mucosal lesions identified. Visual feature analysis and reported risk factors indicate advanced OPMD or potential malignant transformation. Urgent specialist evaluation is required."
-            confidence = round(min(97.5, max(84.0, 89.0 + delta)), 1)
+            confidence = max(cancer_prob, erythroplakia_prob, osmf_prob)
         else:
             prediction = "High-risk oral mucosal indicators detected. Automated feature classification flag high probability of suspicious OPMD lesion requiring immediate specialist biopsy and assessment."
-            confidence = round(min(95.0, max(82.0, 86.0 + delta)), 1)
+            confidence = max(suspicious_prob, leukoplakia_prob, cancer_prob)
 
         suggestions = [
             "URGENT: Consult an oral oncologist, ENT specialist, or oral surgeon immediately without delay",
