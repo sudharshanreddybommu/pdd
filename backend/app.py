@@ -631,10 +631,10 @@ def ai_predict(left_img_b64, front_img_b64, right_img_b64, symptoms=None):
     }
 
 
-def send_verification_link_via_brevo(to_email, token, user_type="patient"):
-    # Construct base backend URL (supports Render Cloud + Local Network IP)
-    backend_host = request.host_url.rstrip('/') if request else "https://oralscan-backend-gmup.onrender.com"
-    verify_url = f"{backend_host}/api/verify-email-token?token={token}&email={urllib.parse.quote(to_email)}&user_type={user_type}"
+def send_verification_link_via_brevo(to_email, token, user_type="patient", otp_code="123456"):
+    # Always use public cloud URL for email links so mobile phones (4G/5G/Wi-Fi) can access it without localhost errors
+    cloud_verify_url = f"https://oralscan-backend-gmup.onrender.com/api/verify-email-token?token={token}&email={urllib.parse.quote(to_email)}&user_type={user_type}"
+    local_verify_url = f"http://localhost:5000/api/verify-email-token?token={token}&email={urllib.parse.quote(to_email)}&user_type={user_type}"
 
     html_content = f"""
     <html>
@@ -647,18 +647,25 @@ def send_verification_link_via_brevo(to_email, token, user_type="patient"):
         </div>
         <div style="padding:36px 32px;text-align:center;">
           <h2 style="color:#f1f5f9;margin:0 0 12px;font-size:20px;">Verify Your Email Address</h2>
-          <p style="color:#94a3b8;font-size:14px;margin:0 0 32px;line-height:1.6;">
-            Thank you for registering with OralScan AI. Please click the button below to verify your email address and activate your account.
+          <p style="color:#94a3b8;font-size:14px;margin:0 0 24px;line-height:1.6;">
+            Thank you for registering with OralScan AI. Click the button below or use your 6-digit OTP code to verify your account.
           </p>
-          <div style="margin-bottom:32px;">
-            <a href="{verify_url}" target="_blank" style="background:linear-gradient(135deg,#0ea5e9,#6366f1);color:#ffffff;padding:16px 36px;text-decoration:none;border-radius:30px;font-weight:bold;font-size:16px;display:inline-block;box-shadow:0 6px 20px rgba(14,165,233,0.4);">
+
+          <div style="margin-bottom:28px;">
+            <a href="{cloud_verify_url}" target="_blank" style="background:linear-gradient(135deg,#0ea5e9,#6366f1);color:#ffffff;padding:16px 36px;text-decoration:none;border-radius:30px;font-weight:bold;font-size:16px;display:inline-block;box-shadow:0 6px 20px rgba(14,165,233,0.4);">
               ✉️ Click Here to Verify Email →
             </a>
           </div>
+
+          <div style="background:#0f172a;border:2px dashed #0ea5e9;border-radius:12px;padding:16px;margin-bottom:24px;display:inline-block;min-width:200px;">
+            <div style="color:#94a3b8;font-size:12px;margin-bottom:4px;">OR ENTER 6-DIGIT OTP IN APP</div>
+            <div style="font-size:32px;font-weight:900;letter-spacing:10px;color:#0ea5e9;font-family:monospace;">{otp_code}</div>
+          </div>
+
           <p style="color:#64748b;font-size:12px;margin:0;line-height:1.6;">
-            ⏱️ This verification link is valid for <strong style="color:#f59e0b;">15 minutes</strong>.<br>
-            If the button doesn't work, copy and paste this link in your browser:<br>
-            <a href="{verify_url}" style="color:#0ea5e9;word-break:break-all;">{verify_url}</a>
+            ⏱️ Valid for <strong style="color:#f59e0b;">15 minutes</strong>.<br>
+            If using Local Desktop Browser, click here:<br>
+            <a href="{local_verify_url}" style="color:#0ea5e9;word-break:break-all;">{local_verify_url}</a>
           </p>
         </div>
         <div style="background:#0f172a;padding:20px 32px;text-align:center;border-top:1px solid #1e293b;">
@@ -703,7 +710,7 @@ def send_verification_link_via_brevo(to_email, token, user_type="patient"):
                 "sender": {"name": "OralScan AI", "email": EMAIL_USER},
                 "to": [{"email": to_email}],
                 "subject": "✉️ Verify your Email Address — OralScan AI",
-                "textContent": f"Please verify your OralScan AI account: {verify_url}",
+                "textContent": f"Please verify your OralScan AI account: {cloud_verify_url} or use OTP: {otp_code}",
                 "htmlContent": html_content
             }
             req = urllib.request.Request(url, data=json.dumps(body).encode('utf-8'), headers=headers)
@@ -732,6 +739,7 @@ def send_verification_link():
         return jsonify({"error": "Email address is required"}), 400
 
     token = secrets.token_urlsafe(32)
+    otp_code = generate_otp()
     expires_at = (datetime.now() + timedelta(minutes=15)).isoformat()
 
     conn = get_db()
@@ -740,17 +748,24 @@ def send_verification_link():
         "INSERT INTO email_verifications (email, token, user_type, expires_at, is_verified) VALUES (?, ?, ?, ?, 0)",
         (email, token, user_type, expires_at)
     )
+    # Save to email_otps table as well so 6-digit OTP code works interchangeably
+    conn.execute("DELETE FROM email_otps WHERE email=?", (email,))
+    conn.execute(
+        "INSERT INTO email_otps (email, otp, expires_at, attempts) VALUES (?, ?, ?, 0)",
+        (email, otp_code, expires_at)
+    )
     conn.commit()
     conn.close()
 
-    success, result_msg = send_verification_link_via_brevo(email, token, user_type)
+    success, result_msg = send_verification_link_via_brevo(email, token, user_type, otp_code)
     if not success:
         return jsonify({"error": f"Failed to send email verification link: {result_msg}"}), 500
 
     return jsonify({
         "message": f"Verification email sent to {email}. Please check your inbox or spam folder and click the link.",
         "email_sent": True,
-        "token": token
+        "token": token,
+        "otp": otp_code
     }), 200
 
 
