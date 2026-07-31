@@ -142,7 +142,9 @@ export default function PatientAppointments() {
                 <div className="appt-card" key={appt.id}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
                     <div>
-                      <div style={{ fontWeight: 700, fontSize: 17, marginBottom: 4 }}>Dr. {appt.doctor_name}</div>
+                      <div style={{ fontWeight: 700, fontSize: 17, marginBottom: 4 }}>
+                        {appt.doctor_name ? (appt.doctor_name.startsWith('Dr.') ? appt.doctor_name : `Dr. ${appt.doctor_name}`) : 'Doctor'}
+                      </div>
                       <div style={{ color: 'var(--primary)', fontSize: 13, marginBottom: 8 }}>🏥 {appt.doctor_hospital}</div>
                       {appt.specialization && <div className="tag" style={{ marginBottom: 8 }}>{appt.specialization}</div>}
                     </div>
