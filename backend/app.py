@@ -900,6 +900,7 @@ def check_email_verification_status():
     conn.close()
     return jsonify({"verified": False}), 200
 
+@app.route('/send-otp', methods=['POST'])
 @app.route('/api/send-otp', methods=['POST'])
 def send_otp():
     data = request.get_json() or {}
@@ -955,6 +956,7 @@ def send_otp():
     }), 200
 
 
+@app.route('/verify-otp', methods=['POST'])
 @app.route('/api/verify-otp', methods=['POST'])
 def verify_otp():
     data = request.get_json() or {}
