@@ -10,6 +10,7 @@ import secrets
 import urllib.parse
 import smtplib
 import urllib.request
+import threading
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timedelta
@@ -729,6 +730,19 @@ def send_verification_link_via_brevo(to_email, token, user_type="patient", otp_c
 
 # ─── AUTH ROUTES ──────────────────────────────────────────────────────────────
 
+def _async_sync_to_cloud(email, user_type, token, otp_code):
+    try:
+        cloud_req = urllib.request.Request(
+            "https://oralscan-backend-gmup.onrender.com/api/send-verification-link",
+            data=json.dumps({"email": email, "user_type": user_type, "sync_token": token, "sync_otp": otp_code}).encode('utf-8'),
+            headers={"Content-Type": "application/json"}
+        )
+        with urllib.request.urlopen(cloud_req, timeout=15) as res:
+            print(f"[CLOUD SYNC SUCCESS] Token & OTP synced to Render Cloud for {email} ({res.status})")
+    except Exception as sync_err:
+        print(f"[CLOUD SYNC NOTE] {sync_err}")
+
+
 @app.route('/send-verification-link', methods=['POST'])
 @app.route('/api/send-verification-link', methods=['POST'])
 def send_verification_link():
@@ -759,22 +773,18 @@ def send_verification_link():
     conn.commit()
     conn.close()
 
-    # If running on local server and this is NOT an incoming sync request, sync token to Render Cloud database as well
-    if not sync_token and request and ("localhost" in request.host_url or "127.0.0.1" in request.host_url):
-        try:
-            cloud_req = urllib.request.Request(
-                "https://oralscan-backend-gmup.onrender.com/api/send-verification-link",
-                data=json.dumps({"email": email, "user_type": user_type, "sync_token": token, "sync_otp": otp_code}).encode('utf-8'),
-                headers={"Content-Type": "application/json"}
-            )
-            urllib.request.urlopen(cloud_req, timeout=4)
-            print(f"[CLOUD SYNC SUCCESS] Token & OTP synced to Render Cloud for {email}")
-        except Exception as sync_err:
-            print(f"[CLOUD SYNC NOTE] {sync_err}")
-
-    # If this was a sync request from local server, don't resend duplicate email
+    # If this was an incoming sync request from local server, don't send duplicate email, just store in DB
     if sync_token:
+        print(f"[RENDER CLOUD SYNCED] Saved synced token & OTP for {email}")
         return jsonify({"message": "Token synced to cloud successfully", "synced": True}), 200
+
+    # If running on local server, fire async background thread to sync token & OTP to Render Cloud
+    if request and ("localhost" in request.host_url or "127.0.0.1" in request.host_url):
+        threading.Thread(
+            target=_async_sync_to_cloud,
+            args=(email, user_type, token, otp_code),
+            daemon=True
+        ).start()
 
     success, result_msg = send_verification_link_via_brevo(email, token, user_type, otp_code)
     if not success:
