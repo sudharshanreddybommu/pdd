@@ -142,8 +142,16 @@ export default function PatientResults() {
     const reportText = `${t('resultsTitle')}. ${cfg.label}. ${displayTitle}. ${displayMessage}.`
 
     const utterance = new SpeechSynthesisUtterance(reportText)
-    utterance.lang = langCodes[lang] || 'en-US'
-    utterance.rate = 0.9
+    const targetLang = langCodes[lang] || 'en-US'
+    utterance.lang = targetLang
+    utterance.rate = 0.85
+
+    // Find native voice for selected language if available
+    const voices = window.speechSynthesis.getVoices()
+    const matchingVoice = voices.find(v => v.lang === targetLang || v.lang.startsWith(lang))
+    if (matchingVoice) {
+      utterance.voice = matchingVoice
+    }
 
     utterance.onend = () => setIsSpeaking(false)
     utterance.onerror = () => setIsSpeaking(false)

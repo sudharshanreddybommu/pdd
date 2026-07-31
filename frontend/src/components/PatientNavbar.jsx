@@ -12,9 +12,14 @@ export default function PatientNavbar() {
   const user = JSON.parse(localStorage.getItem('patientUser') || '{}')
 
   useEffect(() => {
-    getNotifications().then(r => {
-      setUnread(r.data.filter(n => !n.is_read).length)
-    }).catch(() => {})
+    const fetchUnread = () => {
+      getNotifications().then(r => {
+        setUnread((r.data || []).filter(n => !n.is_read).length)
+      }).catch(() => setUnread(0))
+    }
+    fetchUnread()
+    window.addEventListener('notifications-cleared', () => setUnread(0))
+    return () => window.removeEventListener('notifications-cleared', () => setUnread(0))
   }, [location.pathname])
 
   useEffect(() => {

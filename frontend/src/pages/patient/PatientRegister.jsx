@@ -97,9 +97,9 @@ export default function PatientRegister() {
       if (res.data?.token) {
         localStorage.setItem('patientToken', res.data.token)
         localStorage.setItem('userType', 'patient')
-        if (res.data.patient) {
-          localStorage.setItem('patientData', JSON.stringify(res.data.patient))
-        }
+        const patientObj = res.data.patient || { email, name: name.trim(), phone: phone.trim(), age: age ? parseInt(age) : null }
+        localStorage.setItem('patientData', JSON.stringify(patientObj))
+        localStorage.setItem('patientUser', JSON.stringify(patientObj))
       }
       navigate('/patient/home')
     } catch (err) {

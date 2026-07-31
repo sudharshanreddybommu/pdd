@@ -52,10 +52,13 @@ export default function PatientAppointments() {
   const handleClearNotifications = async () => {
     try {
       await clearNotifications()
+    } catch (e) {
+      console.warn('Backend clear notification note:', e)
+    } finally {
+      setNotifications([])
+      localStorage.setItem('patientNotifications', JSON.stringify([]))
+      window.dispatchEvent(new Event('notifications-cleared'))
       toast.info('Notifications cleared')
-      load()
-    } catch {
-      toast.error('Failed to clear')
     }
   }
 

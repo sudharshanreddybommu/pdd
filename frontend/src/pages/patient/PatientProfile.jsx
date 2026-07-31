@@ -11,7 +11,7 @@ export default function PatientProfile() {
   const [fetching, setFetching] = useState(true)
 
   useEffect(() => {
-    const localUser = JSON.parse(localStorage.getItem('patientUser') || '{}')
+    const localUser = JSON.parse(localStorage.getItem('patientUser') || localStorage.getItem('patientData') || '{}')
     if (localUser.name || localUser.email || localUser.phone) {
       setForm({
         name: localUser.name || '',
@@ -26,7 +26,9 @@ export default function PatientProfile() {
       const p = r.data
       if (p) {
         setForm({ name: p.name || '', phone: p.phone || '', address: p.address || '', age: p.age || '' })
-        localStorage.setItem('patientUser', JSON.stringify({ ...localUser, ...p }))
+        const merged = { ...localUser, ...p }
+        localStorage.setItem('patientUser', JSON.stringify(merged))
+        localStorage.setItem('patientData', JSON.stringify(merged))
       }
     }).catch(() => {}).finally(() => setFetching(false))
   }, [])
@@ -37,14 +39,17 @@ export default function PatientProfile() {
     setLoading(true)
     try {
       const res = await updatePatientProfile(form)
-      const current = JSON.parse(localStorage.getItem('patientUser') || '{}')
+      const current = JSON.parse(localStorage.getItem('patientUser') || localStorage.getItem('patientData') || '{}')
       const updated = { ...current, ...form, ...(res.data?.patient || {}) }
       localStorage.setItem('patientUser', JSON.stringify(updated))
+      localStorage.setItem('patientData', JSON.stringify(updated))
       toast.success('Profile saved successfully!')
       navigate('/patient/home')
     } catch {
-      const current = JSON.parse(localStorage.getItem('patientUser') || '{}')
-      localStorage.setItem('patientUser', JSON.stringify({ ...current, ...form }))
+      const current = JSON.parse(localStorage.getItem('patientUser') || localStorage.getItem('patientData') || '{}')
+      const updated = { ...current, ...form }
+      localStorage.setItem('patientUser', JSON.stringify(updated))
+      localStorage.setItem('patientData', JSON.stringify(updated))
       toast.success('Profile saved locally!')
       navigate('/patient/home')
     } finally {
