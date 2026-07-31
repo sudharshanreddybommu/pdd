@@ -49,7 +49,7 @@ export default function PatientRegister() {
         } catch (err) {
           console.log('Polling check note:', err)
         }
-      }, 3000)
+      }, 1500)
     }
     return () => clearInterval(interval)
   }, [waitingForVerification, email, step])

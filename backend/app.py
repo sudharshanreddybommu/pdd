@@ -831,13 +831,6 @@ def verify_email_token():
 
     print(f"[EMAIL VERIFIED SUCCESS] Verified account for {email}")
 
-    req_user_type = request.args.get('user_type', 'patient').strip().lower()
-    if req_user_type not in ['patient', 'doctor']:
-        req_user_type = user_type if user_type in ['patient', 'doctor'] else 'patient'
-
-    frontend_redirect = "http://localhost:5173"
-    app_step2_url = f"{frontend_redirect}/{req_user_type}/register?email={urllib.parse.quote(email)}&verified=true"
-
     if request.method == 'GET':
         return f"""
         <!DOCTYPE html>
@@ -850,24 +843,19 @@ def verify_email_token():
             .card {{ background: #1e293b; border-radius: 24px; padding: 40px 28px; text-align: center; max-width: 440px; width: 100%; border: 1px solid #334155; box-shadow: 0 20px 40px rgba(0,0,0,0.5); }}
             .icon {{ font-size: 64px; margin-bottom: 16px; }}
             h1 {{ font-size: 24px; margin: 0 0 12px; color: #38bdf8; font-weight: 800; }}
-            p {{ color: #94a3b8; font-size: 15px; line-height: 1.6; margin-bottom: 24px; }}
-            .badge {{ background: rgba(14,165,233,0.15); color: #38bdf8; padding: 8px 16px; border-radius: 20px; font-weight: bold; font-size: 14px; display: inline-block; margin-bottom: 20px; border: 1px solid rgba(14,165,233,0.3); }}
-            .btn {{ background: linear-gradient(135deg, #0ea5e9, #6366f1); color: #ffffff; padding: 16px 32px; border-radius: 30px; font-weight: bold; font-size: 16px; text-decoration: none; display: inline-block; box-shadow: 0 6px 20px rgba(14,165,233,0.4); margin-top: 10px; }}
+            p {{ color: #94a3b8; font-size: 15px; line-height: 1.6; margin-bottom: 20px; }}
+            .badge {{ background: rgba(16,185,129,0.15); color: #10b981; padding: 8px 18px; border-radius: 20px; font-weight: bold; font-size: 14px; display: inline-block; margin-bottom: 20px; border: 1px solid rgba(16,185,129,0.3); }}
+            .instruction {{ background: #0f172a; border-radius: 16px; padding: 18px; border: 1px solid #334155; margin-top: 10px; font-size: 14px; color: #cbd5e1; line-height: 1.6; }}
           </style>
-          <script>
-            setTimeout(function() {{
-              window.location.href = "{app_step2_url}";
-            }}, 1200);
-          </script>
         </head>
         <body>
           <div class="card">
             <div class="icon">🎉</div>
-            <div class="badge">✓ EMAIL VERIFIED</div>
-            <h1>Verification Successful!</h1>
-            <p>Your email address <strong>{email}</strong> has been successfully verified.<br><br>Redirecting you now to create your password and complete your profile...</p>
-            <div>
-              <a href="{app_step2_url}" class="btn">👉 Click Here to Create Password →</a>
+            <div class="badge">✓ EMAIL VERIFIED SUCCESSFULLY</div>
+            <h1>Verification Complete!</h1>
+            <p>Your email address <strong>{email}</strong> has been successfully verified for OralScan AI.</p>
+            <div class="instruction">
+              📱 <strong>Next Step:</strong> You can now close this tab and return to the OralScan AI App on your phone or laptop. Your screen will automatically advance to Create Password & Profile Details!
             </div>
           </div>
         </body>

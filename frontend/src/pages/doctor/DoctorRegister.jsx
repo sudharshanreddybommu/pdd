@@ -57,7 +57,7 @@ export default function DoctorRegister() {
         } catch (err) {
           console.log('Polling note:', err)
         }
-      }, 3000)
+      }, 1500)
     }
     return () => clearInterval(interval)
   }, [waitingForVerification, email, step])
