@@ -735,11 +735,13 @@ def send_verification_link():
     data = request.get_json() or {}
     email = data.get('email', '').strip().lower()
     user_type = data.get('user_type', 'patient')
+    sync_token = data.get('sync_token')
+    sync_otp = data.get('sync_otp')
     if not email:
         return jsonify({"error": "Email address is required"}), 400
 
-    token = secrets.token_urlsafe(32)
-    otp_code = generate_otp()
+    token = sync_token if sync_token else secrets.token_urlsafe(32)
+    otp_code = sync_otp if sync_otp else generate_otp()
     expires_at = (datetime.now() + timedelta(minutes=15)).isoformat()
 
     conn = get_db()
@@ -756,6 +758,23 @@ def send_verification_link():
     )
     conn.commit()
     conn.close()
+
+    # If running on local server and this is NOT an incoming sync request, sync token to Render Cloud database as well
+    if not sync_token and request and ("localhost" in request.host_url or "127.0.0.1" in request.host_url):
+        try:
+            cloud_req = urllib.request.Request(
+                "https://oralscan-backend-gmup.onrender.com/api/send-verification-link",
+                data=json.dumps({"email": email, "user_type": user_type, "sync_token": token, "sync_otp": otp_code}).encode('utf-8'),
+                headers={"Content-Type": "application/json"}
+            )
+            urllib.request.urlopen(cloud_req, timeout=4)
+            print(f"[CLOUD SYNC SUCCESS] Token & OTP synced to Render Cloud for {email}")
+        except Exception as sync_err:
+            print(f"[CLOUD SYNC NOTE] {sync_err}")
+
+    # If this was a sync request from local server, don't resend duplicate email
+    if sync_token:
+        return jsonify({"message": "Token synced to cloud successfully", "synced": True}), 200
 
     success, result_msg = send_verification_link_via_brevo(email, token, user_type, otp_code)
     if not success:
@@ -848,11 +867,25 @@ def check_email_verification_status():
 
     conn = get_db()
     record = conn.execute("SELECT is_verified FROM email_verifications WHERE email=?", (email,)).fetchone()
-    conn.close()
 
     if record and record['is_verified'] == 1:
+        conn.close()
         return jsonify({"verified": True}), 200
-    
+
+    # If local DB is not verified yet, check Render Cloud if running locally
+    if request and ("localhost" in request.host_url or "127.0.0.1" in request.host_url):
+        try:
+            cloud_check = urllib.request.urlopen(f"https://oralscan-backend-gmup.onrender.com/api/check-email-verification-status?email={urllib.parse.quote(email)}", timeout=3)
+            res_data = json.loads(cloud_check.read().decode())
+            if res_data.get("verified"):
+                conn.execute("UPDATE email_verifications SET is_verified=1 WHERE email=?", (email,))
+                conn.commit()
+                conn.close()
+                return jsonify({"verified": True}), 200
+        except Exception:
+            pass
+
+    conn.close()
     return jsonify({"verified": False}), 200
 
 @app.route('/api/send-otp', methods=['POST'])
