@@ -1,13 +1,13 @@
 import axios from 'axios'
 import { executeLocalFallback } from './localEngine'
 
-const hostname = window.location.hostname;
-const isLocalHost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.168.') || hostname.startsWith('10.');
-const API_URL = isLocalHost ? 'http://localhost:5000' : 'https://oralscan-backend-gmup.onrender.com';
+const isCapacitorNative = !!window.Capacitor || window.location.protocol === 'capacitor:' || window.location.href.includes('capacitor://');
+const isDesktopDev = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && !isCapacitorNative && window.location.port !== '';
+const API_URL = isDesktopDev ? 'http://localhost:5000' : 'https://oralscan-backend-gmup.onrender.com';
 
 const API = axios.create({ 
   baseURL: API_URL,
-  timeout: 12000 // 12-second timeout to allow real Gmail SMTP OTP delivery
+  timeout: 15000 // 15-second timeout for mobile 4G/5G connections
 })
 
 API.interceptors.request.use(config => {

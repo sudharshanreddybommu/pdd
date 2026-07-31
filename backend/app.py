@@ -884,18 +884,18 @@ def check_email_verification_status():
         conn.close()
         return jsonify({"verified": True}), 200
 
-    # If local DB is not verified yet, check Render Cloud if running locally
-    if request and ("localhost" in request.host_url or "127.0.0.1" in request.host_url):
-        try:
-            cloud_check = urllib.request.urlopen(f"https://oralscan-backend-gmup.onrender.com/api/check-email-verification-status?email={urllib.parse.quote(email)}", timeout=3)
-            res_data = json.loads(cloud_check.read().decode())
-            if res_data.get("verified"):
-                conn.execute("UPDATE email_verifications SET is_verified=1 WHERE email=?", (email,))
-                conn.commit()
-                conn.close()
-                return jsonify({"verified": True}), 200
-        except Exception:
-            pass
+    # If local DB is not verified yet, query Render Cloud to see if user clicked verification link from mobile phone
+    try:
+        cloud_check = urllib.request.urlopen(f"https://oralscan-backend-gmup.onrender.com/api/check-email-verification-status?email={urllib.parse.quote(email)}", timeout=8)
+        res_data = json.loads(cloud_check.read().decode())
+        if res_data.get("verified"):
+            expires_at = (datetime.now() + timedelta(days=365)).isoformat()
+            conn.execute("INSERT OR REPLACE INTO email_verifications (email, token, user_type, expires_at, is_verified) VALUES (?, 'cloud-verified', 'patient', ?, 1)", (email, expires_at))
+            conn.commit()
+            conn.close()
+            return jsonify({"verified": True}), 200
+    except Exception as err:
+        print(f"[CHECK VERIFICATION CLOUD NOTE] {err}")
 
     conn.close()
     return jsonify({"verified": False}), 200

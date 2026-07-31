@@ -92,6 +92,24 @@ export default function DoctorRegister() {
     }
   }
 
+  const handleManualCheck = async () => {
+    setLoading(true)
+    try {
+      const res = await checkEmailVerificationStatus(email)
+      if (res.data?.verified) {
+        toast.success('🎉 Doctor email verified! Proceeding to account setup...')
+        setWaitingForVerification(false)
+        setStep(2)
+      } else {
+        toast.info('Verification in progress... If you clicked the link in your email, please click this button again in a moment!')
+      }
+    } catch (err) {
+      toast.info('Checking verification status... Please ensure you clicked the link in your email.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleSwitchToOtp = async () => {
     setLoading(true)
     try {
@@ -205,6 +223,16 @@ export default function DoctorRegister() {
             </div>
 
             <div className="spinner" style={{ margin: '0 auto 20px' }} />
+
+            <button
+              type="button"
+              className="btn btn-block btn-lg mb-3"
+              onClick={handleManualCheck}
+              disabled={loading}
+              style={{ background: 'linear-gradient(135deg, #10b981, #059669)', color: '#fff', fontWeight: 'bold', border: 'none', boxShadow: '0 4px 14px rgba(16,185,129,0.4)' }}
+            >
+              {loading ? <div className="spinner" /> : '✓ I Have Clicked Email Link — Proceed to Account Setup →'}
+            </button>
 
             <button type="button" className="btn btn-secondary btn-block" onClick={handleSwitchToOtp} disabled={loading}>
               🔢 Prefer entering 6-Digit OTP Code instead? Click Here
