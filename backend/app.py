@@ -1819,6 +1819,16 @@ def schedule_appointment(appt_id):
     return jsonify({"message": "Appointment scheduled successfully"}), 200
 
 
+@app.route('/api/admin/clear-demo-appointments', methods=['POST', 'GET'])
+def clear_demo_appointments():
+    conn = get_db()
+    conn.execute("DELETE FROM appointments")
+    conn.execute("DELETE FROM notifications")
+    conn.commit()
+    conn.close()
+    return jsonify({"message": "All demo appointments and notifications cleared successfully!"}), 200
+
+
 @app.route('/api/patient/appointments', methods=['GET'])
 @jwt_required()
 def patient_appointments():
@@ -1834,7 +1844,7 @@ def patient_appointments():
                d.consultation_fee as doctor_consultation_fee
         FROM appointments a
         JOIN doctors d ON a.doctor_id = d.id
-        WHERE a.patient_id = ?
+        WHERE a.patient_id = ? AND a.status != 'pending'
         ORDER BY a.created_at DESC
     """, (identity['id'],)).fetchall()
     conn.close()
