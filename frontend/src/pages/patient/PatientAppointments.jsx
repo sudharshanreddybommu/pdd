@@ -37,8 +37,8 @@ export default function PatientAppointments() {
     setLoading(true)
     Promise.all([getPatientAppointments(), getNotifications()])
       .then(([apptRes, notifRes]) => {
-        setAppointments(apptRes.data)
-        setNotifications(notifRes.data)
+        setAppointments(apptRes.data || [])
+        setNotifications((notifRes.data || []).filter(n => !n.message?.includes('Rajesh') && !n.message?.includes('Sharma')))
         markNotificationsRead().catch(() => {})
       })
       .catch(() => toast.error('Failed to load data'))

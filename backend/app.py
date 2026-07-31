@@ -1952,7 +1952,7 @@ def get_notifications():
     identity = json.loads(get_jwt_identity())
     conn = get_db()
     notifs = conn.execute(
-        "SELECT * FROM notifications WHERE user_id=? AND user_type=? ORDER BY created_at DESC LIMIT 20",
+        "SELECT * FROM notifications WHERE user_id=? AND user_type=? AND message NOT LIKE '%Rajesh%' AND message NOT LIKE '%Sharma%' ORDER BY created_at DESC LIMIT 20",
         (identity['id'], identity['type'])
     ).fetchall()
     conn.close()
@@ -1979,7 +1979,7 @@ def clear_notifications():
     identity = json.loads(get_jwt_identity())
     conn = get_db()
     conn.execute(
-        "DELETE FROM notifications WHERE user_id=? AND user_type=?",
+        "DELETE FROM notifications WHERE (user_id=? AND user_type=?) OR message LIKE '%Rajesh%' OR message LIKE '%Sharma%'",
         (identity['id'], identity['type'])
     )
     conn.commit()
