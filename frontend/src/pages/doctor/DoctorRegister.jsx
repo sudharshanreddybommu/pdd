@@ -1,7 +1,7 @@
-import { useState, useRef, useEffect } from 'react'
-import { useNavigate, useSearchParams, Link } from 'react-router-dom'
+import { useState, useRef } from 'react'
+import { useNavigate, Link } from 'react-router-dom'
 import { toast } from 'react-toastify'
-import { sendVerificationLink, checkEmailVerificationStatus, doctorRegister, sendOtp, verifyOtp } from '../../services/api'
+import { doctorRegister, sendOtp, verifyOtp } from '../../services/api'
 
 const DOC_TYPES = [
   { key: 'profile_image', label: 'Professional Profile Photo', icon: '👤', required: true },
@@ -12,7 +12,6 @@ const DOC_TYPES = [
 
 export default function DoctorRegister() {
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
 
   const [step, setStep] = useState(0)
   const [email, setEmail] = useState('')
@@ -22,45 +21,10 @@ export default function DoctorRegister() {
   const [confirm, setConfirm] = useState('')
   const [fee, setFee] = useState('')
   const [loading, setLoading] = useState(false)
-  const [waitingForVerification, setWaitingForVerification] = useState(false)
   const [submitted, setSubmitted] = useState(false)
-
-  // OTP Fallback
-  const [useOtpFallback, setUseOtpFallback] = useState(false)
   const [otp, setOtp] = useState(['', '', '', '', '', ''])
 
   const fileRefs = useRef({})
-
-  // Check URL query parameters if returning from email link click
-  useEffect(() => {
-    const urlEmail = searchParams.get('email')
-    const urlVerified = searchParams.get('verified')
-    if (urlEmail && urlVerified === 'true') {
-      setEmail(urlEmail)
-      setStep(2)
-      toast.success('Doctor email verified successfully! Upload documents below.')
-    }
-  }, [searchParams])
-
-  // Background polling for Email Verification Status
-  useEffect(() => {
-    let interval
-    if (waitingForVerification && email && step === 1) {
-      interval = setInterval(async () => {
-        try {
-          const res = await checkEmailVerificationStatus(email)
-          if (res.data?.verified) {
-            toast.success('🎉 Doctor email verified! Proceeding...')
-            setWaitingForVerification(false)
-            setStep(2)
-          }
-        } catch (err) {
-          console.log('Polling note:', err)
-        }
-      }, 1500)
-    }
-    return () => clearInterval(interval)
-  }, [waitingForVerification, email, step])
 
   const handleFileUpload = (key, file) => {
     if (!file) return
@@ -72,6 +36,7 @@ export default function DoctorRegister() {
     reader.readAsDataURL(file)
   }
 
+  // Step 0: Send 6-Digit Doctor OTP
   const handleEmailSubmit = async e => {
     e.preventDefault()
     if (!email) return toast.error('Enter your email address')
@@ -81,48 +46,30 @@ export default function DoctorRegister() {
     }
     setLoading(true)
     try {
-      await sendVerificationLink(email.trim(), 'doctor')
-      toast.success('✉️ Verification link sent to your email! Please check your Gmail inbox / spam folder.')
-      setWaitingForVerification(true)
+      await sendOtp(email.trim(), 'doctor')
+      toast.success('✉️ 6-digit OTP code sent to your professional email!')
       setStep(1)
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to send verification link')
+      toast.error(err.response?.data?.error || 'Failed to send OTP code')
     } finally {
       setLoading(false)
     }
   }
 
-  const handleManualCheck = async () => {
+  // Resend OTP
+  const handleResendOtp = async () => {
     setLoading(true)
     try {
-      const res = await checkEmailVerificationStatus(email)
-      if (res.data?.verified) {
-        toast.success('🎉 Doctor email verified! Proceeding to account setup...')
-        setWaitingForVerification(false)
-        setStep(2)
-      } else {
-        toast.info('Verification in progress... If you clicked the link in your email, please click this button again in a moment!')
-      }
+      await sendOtp(email.trim(), 'doctor')
+      toast.success('✉️ Fresh 6-digit OTP code sent to your email!')
     } catch (err) {
-      toast.info('Checking verification status... Please ensure you clicked the link in your email.')
+      toast.error(err.response?.data?.error || 'Failed to resend OTP')
     } finally {
       setLoading(false)
     }
   }
 
-  const handleSwitchToOtp = async () => {
-    setLoading(true)
-    try {
-      await sendOtp(email, 'doctor')
-      setUseOtpFallback(true)
-      toast.success('6-digit OTP sent to your email address!')
-    } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to send OTP')
-    } finally {
-      setLoading(false)
-    }
-  }
-
+  // Step 1: Verify 6-Digit Doctor OTP
   const handleOtpSubmit = async e => {
     e.preventDefault()
     const code = otp.join('')
@@ -130,15 +77,16 @@ export default function DoctorRegister() {
     setLoading(true)
     try {
       await verifyOtp(email, code)
-      toast.success('Email verified!')
+      toast.success('🎉 Doctor email verified successfully!')
       setStep(2)
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Invalid OTP')
+      toast.error(err.response?.data?.error || 'Invalid OTP code')
     } finally {
       setLoading(false)
     }
   }
 
+  // Step 2: Complete Doctor Registration
   const handleDocSubmit = async e => {
     e.preventDefault()
     if (!docs.profile_image) return toast.error('Profile Photo is required')
@@ -183,7 +131,7 @@ export default function DoctorRegister() {
             <div style={{ textAlign: 'center', marginBottom: 20 }}>
               <span style={{ fontSize: 40 }}>🩺</span>
               <h2 className="auth-title" style={{ marginTop: 8 }}>Doctor Registration</h2>
-              <p className="auth-subtitle">Enter your medical email to receive a verification link</p>
+              <p className="auth-subtitle">Enter your medical email to receive a 6-digit OTP code</p>
             </div>
 
             <div className="form-group">
@@ -200,61 +148,25 @@ export default function DoctorRegister() {
             </div>
 
             <button className="btn btn-primary btn-block btn-lg" disabled={loading}>
-              {loading ? <div className="spinner" /> : '✉️ Send Doctor Verification Link →'}
+              {loading ? <div className="spinner" /> : '✉️ Send 6-Digit OTP Code →'}
             </button>
           </form>
         )}
 
-        {/* STEP 1: Doctor Email Verification — Dual Options (Link Click OR 6-Digit OTP Input) */}
+        {/* STEP 1: Enter 6-Digit Doctor OTP */}
         {step === 1 && (
           <div style={{ textAlign: 'center', padding: '5px 0' }}>
-            <div style={{ fontSize: 40, marginBottom: 6 }}>📩</div>
-            <h2 className="auth-title">Verify Doctor Email</h2>
-            <p className="auth-subtitle" style={{ marginBottom: 16 }}>
-              Sent verification link & 6-digit OTP code to <strong style={{ color: 'var(--primary)' }}>{email}</strong>
+            <div style={{ fontSize: 44, marginBottom: 6 }}>📩</div>
+            <h2 className="auth-title">Verify Doctor OTP Code</h2>
+            <p className="auth-subtitle" style={{ marginBottom: 20 }}>
+              Sent 6-digit verification code to <strong style={{ color: 'var(--primary)' }}>{email}</strong>
             </p>
 
-            {/* OPTION 1: 1-Click Email Link */}
-            <div style={{
-              background: 'rgba(14,165,233,0.08)', padding: 16, borderRadius: 14, border: '1px solid rgba(14,165,233,0.25)',
-              marginBottom: 16, textAlign: 'left'
-            }}>
-              <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--primary)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span>✉️</span> Option 1: 1-Click Email Link
-              </div>
-              <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '0 0 10px', lineHeight: 1.4 }}>
-                Open <strong>Gmail Inbox / Spam folder</strong>, click <strong>"Verify Email"</strong>, then tap below:
-              </p>
-              <button
-                type="button"
-                className="btn btn-block"
-                onClick={handleManualCheck}
-                disabled={loading}
-                style={{ background: 'linear-gradient(135deg, #10b981, #059669)', color: '#fff', fontWeight: 700, border: 'none', borderRadius: 10, padding: '11px', fontSize: 14 }}
-              >
-                {loading ? <div className="spinner" /> : '✓ Clicked Email Link? Proceed to Account Setup →'}
-              </button>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', margin: '14px 0', color: 'var(--text-muted)', fontSize: 11, fontWeight: 700 }}>
-              <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
-              <span style={{ padding: '0 10px', letterSpacing: 1 }}>OR ENTER 6-DIGIT OTP</span>
-              <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
-            </div>
-
-            {/* OPTION 2: Enter 6-Digit OTP Code */}
             <form onSubmit={handleOtpSubmit} style={{
-              background: 'var(--surface-2)', padding: 16, borderRadius: 14, border: '1px solid var(--border)',
-              textAlign: 'left'
+              background: 'var(--surface-2)', padding: 20, borderRadius: 16, border: '1px solid var(--border)',
+              textAlign: 'left', marginBottom: 16
             }}>
-              <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span>🔢</span> Option 2: Enter 6-Digit OTP Code
-              </div>
-              <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '0 0 10px' }}>
-                Enter the 6-digit code shown in your email:
-              </p>
-
-              <div style={{ display: 'flex', gap: 6, justifyContent: 'center', marginBottom: 12 }}>
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginBottom: 16 }}>
                 {otp.map((digit, idx) => (
                   <input
                     key={idx}
@@ -263,8 +175,8 @@ export default function DoctorRegister() {
                     maxLength="1"
                     className="form-control"
                     style={{
-                      width: 40, height: 46, textAlign: 'center', fontSize: 18, fontWeight: 800,
-                      borderRadius: 8, border: '2px solid var(--border)', padding: 0
+                      width: 44, height: 50, textAlign: 'center', fontSize: 22, fontWeight: 800,
+                      borderRadius: 10, border: '2px solid var(--border)', padding: 0
                     }}
                     value={digit}
                     onChange={e => {
@@ -283,28 +195,41 @@ export default function DoctorRegister() {
                         if (prevEl) prevEl.focus()
                       }
                     }}
+                    autoFocus={idx === 0}
                   />
                 ))}
               </div>
 
               <button
                 type="submit"
-                className="btn btn-primary btn-block"
+                className="btn btn-primary btn-block btn-lg"
                 disabled={loading || otp.join('').length < 6}
-                style={{ fontWeight: 700, borderRadius: 10, padding: '11px', fontSize: 14 }}
+                style={{ fontWeight: 700, borderRadius: 10 }}
               >
-                {loading ? <div className="spinner" /> : '✓ Verify OTP Code & Proceed →'}
+                {loading ? <div className="spinner" /> : '✓ Verify Doctor OTP & Continue →'}
               </button>
             </form>
 
-            <button
-              type="button"
-              className="btn btn-link btn-block mt-2"
-              onClick={() => setStep(0)}
-              style={{ fontSize: 13 }}
-            >
-              ← Change Email Address
-            </button>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '0 4px' }}>
+              <button
+                type="button"
+                className="btn btn-link p-0"
+                onClick={handleResendOtp}
+                disabled={loading}
+                style={{ color: 'var(--primary)', fontWeight: 600 }}
+              >
+                🔄 Resend Doctor OTP
+              </button>
+
+              <button
+                type="button"
+                className="btn btn-link p-0"
+                onClick={() => setStep(0)}
+                style={{ color: 'var(--text-muted)' }}
+              >
+                ← Change Email
+              </button>
+            </div>
           </div>
         )}
 
