@@ -959,71 +959,77 @@ def send_otp():
 @app.route('/verify-otp', methods=['POST'])
 @app.route('/api/verify-otp', methods=['POST'])
 def verify_otp():
-    data = request.get_json() or {}
-    email = data.get('email', '').strip().lower()
-    raw_otp = data.get('otp', '')
-    otp = re.sub(r'\D', '', str(raw_otp)).strip()
+    try:
+        data = request.get_json() or {}
+        email = data.get('email', '').strip().lower()
+        raw_otp = data.get('otp', '')
+        otp = re.sub(r'\D', '', str(raw_otp)).strip()
 
-    if not email or not otp:
-        return jsonify({"error": "Email address and 6-digit OTP code are required"}), 400
+        if not email or not otp:
+            return jsonify({"error": "Email address and 6-digit OTP code are required"}), 400
 
-    conn = get_db()
-    record = conn.execute("SELECT * FROM email_otps WHERE email=?", (email,)).fetchone()
+        conn = get_db()
+        record = conn.execute("SELECT * FROM email_otps WHERE email=?", (email,)).fetchone()
 
-    # If not found locally in SQLite, try checking Render Cloud if running locally
-    if not record and request and ("localhost" in request.host_url or "127.0.0.1" in request.host_url):
-        try:
-            cloud_req = urllib.request.Request(
-                "https://oralscan-backend-gmup.onrender.com/api/verify-otp",
-                data=json.dumps({"email": email, "otp": otp}).encode('utf-8'),
-                headers={"Content-Type": "application/json"}
-            )
-            with urllib.request.urlopen(cloud_req, timeout=5) as res:
-                res_data = json.loads(res.read().decode())
-                if res_data.get("verified"):
-                    expires_at = (datetime.now() + timedelta(days=365)).isoformat()
-                    conn.execute("INSERT OR REPLACE INTO email_verifications (email, token, user_type, expires_at, is_verified) VALUES (?, 'otp-verified', 'patient', ?, 1)", (email, expires_at))
-                    conn.commit()
-                    conn.close()
-                    return jsonify({"message": "OTP verified successfully!", "verified": True}), 200
-        except Exception as cloud_err:
-            print(f"[VERIFY OTP CLOUD FALLBACK NOTE] {cloud_err}")
+        # If not found locally in SQLite, try checking Render Cloud if running locally
+        if not record and request and ("localhost" in request.host_url or "127.0.0.1" in request.host_url):
+            try:
+                cloud_req = urllib.request.Request(
+                    "https://oralscan-backend-gmup.onrender.com/api/verify-otp",
+                    data=json.dumps({"email": email, "otp": otp}).encode('utf-8'),
+                    headers={"Content-Type": "application/json"}
+                )
+                with urllib.request.urlopen(cloud_req, timeout=5) as res:
+                    res_data = json.loads(res.read().decode())
+                    if res_data.get("verified"):
+                        expires_at = (datetime.now() + timedelta(days=365)).isoformat()
+                        conn.execute("INSERT OR REPLACE INTO email_verifications (email, token, user_type, expires_at, is_verified) VALUES (?, 'otp-verified', 'patient', ?, 1)", (email, expires_at))
+                        conn.commit()
+                        conn.close()
+                        return jsonify({"message": "OTP verified successfully!", "verified": True}), 200
+            except Exception as cloud_err:
+                print(f"[VERIFY OTP CLOUD FALLBACK NOTE] {cloud_err}")
 
-    if not record:
-        conn.close()
-        return jsonify({"error": "No active OTP code found for this email. Please request a new code or click the email link."}), 400
+        if not record:
+            conn.close()
+            return jsonify({"error": "No active OTP code found for this email. Please request a new code."}), 400
 
-    attempts = record['attempts'] + 1
+        attempts = record['attempts'] + 1
 
-    # Max 5 attempts check
-    if attempts > 5:
+        # Max 5 attempts check
+        if attempts > 5:
+            conn.execute("DELETE FROM email_otps WHERE email=?", (email,))
+            conn.commit()
+            conn.close()
+            return jsonify({"error": "Maximum verification attempts (5) exceeded. Please request a new code."}), 400
+
+        conn.execute("UPDATE email_otps SET attempts=? WHERE email=?", (attempts, email))
+        conn.commit()
+
+        # Format both record OTP and entered OTP with zfill(6) to handle any leading zero issues
+        expected_otp_str = str(record['otp']).strip().zfill(6)
+        entered_otp_str = str(otp).strip().zfill(6)
+
+        # OTP match check (allow zfill format, exact string, or raw int equality)
+        if expected_otp_str != entered_otp_str and str(record['otp']).strip() != str(otp).strip():
+            conn.close()
+            print(f"[OTP MISMATCH] Email: {email} | Entered: '{otp}' | Expected: '{record['otp']}'")
+            return jsonify({"error": f"Invalid OTP code '{otp}'. Please check your email and try again."}), 400
+
+        # SUCCESS: Mark email_verifications as verified!
+        expires_at = (datetime.now() + timedelta(days=365)).isoformat()
+        conn.execute("INSERT OR REPLACE INTO email_verifications (email, token, user_type, expires_at, is_verified) VALUES (?, 'otp-verified', 'patient', ?, 1)", (email, expires_at))
         conn.execute("DELETE FROM email_otps WHERE email=?", (email,))
         conn.commit()
         conn.close()
-        return jsonify({"error": "Maximum verification attempts (5) exceeded. Please request a new code."}), 400
 
-    conn.execute("UPDATE email_otps SET attempts=? WHERE email=?", (attempts, email))
-    conn.commit()
-
-    # Format both record OTP and entered OTP with zfill(6) to handle any leading zero issues
-    expected_otp_str = str(record['otp']).strip().zfill(6)
-    entered_otp_str = str(otp).strip().zfill(6)
-
-    # OTP match check (allow zfill format, exact string, or raw int equality)
-    if expected_otp_str != entered_otp_str and str(record['otp']).strip() != str(otp).strip():
-        conn.close()
-        print(f"[OTP MISMATCH] Email: {email} | Entered: '{otp}' | Expected: '{record['otp']}'")
-        return jsonify({"error": f"Invalid OTP code '{otp}'. Please check your email and try again."}), 400
-
-    # SUCCESS: Mark email_verifications as verified!
-    expires_at = (datetime.now() + timedelta(days=365)).isoformat()
-    conn.execute("INSERT OR REPLACE INTO email_verifications (email, token, user_type, expires_at, is_verified) VALUES (?, 'otp-verified', 'patient', ?, 1)", (email, expires_at))
-    conn.execute("DELETE FROM email_otps WHERE email=?", (email,))
-    conn.commit()
-    conn.close()
-
-    print(f"[OTP VERIFIED SUCCESS] Email: {email} verified successfully via 6-digit OTP!")
-    return jsonify({"message": "OTP verified successfully!", "verified": True}), 200
+        print(f"[OTP VERIFIED SUCCESS] Email: {email} verified successfully via 6-digit OTP!")
+        return jsonify({"message": "OTP verified successfully!", "verified": True}), 200
+    except Exception as err:
+        print(f"[VERIFY OTP ERROR] {err}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"Verification error: {str(err)}"}), 500
 
 
 @app.route('/api/reset-password', methods=['POST'])
