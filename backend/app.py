@@ -959,7 +959,8 @@ def send_otp():
 def verify_otp():
     data = request.get_json() or {}
     email = data.get('email', '').strip().lower()
-    otp = data.get('otp', '').strip()
+    raw_otp = data.get('otp', '')
+    otp = re.sub(r'\D', '', str(raw_otp)).strip()
 
     if not email or not otp:
         return jsonify({"error": "Email address and 6-digit OTP code are required"}), 400
@@ -967,9 +968,28 @@ def verify_otp():
     conn = get_db()
     record = conn.execute("SELECT * FROM email_otps WHERE email=?", (email,)).fetchone()
 
+    # If not found locally in SQLite, try checking Render Cloud if running locally
+    if not record and request and ("localhost" in request.host_url or "127.0.0.1" in request.host_url):
+        try:
+            cloud_req = urllib.request.Request(
+                "https://oralscan-backend-gmup.onrender.com/api/verify-otp",
+                data=json.dumps({"email": email, "otp": otp}).encode('utf-8'),
+                headers={"Content-Type": "application/json"}
+            )
+            with urllib.request.urlopen(cloud_req, timeout=5) as res:
+                res_data = json.loads(res.read().decode())
+                if res_data.get("verified"):
+                    expires_at = (datetime.now() + timedelta(days=365)).isoformat()
+                    conn.execute("INSERT OR REPLACE INTO email_verifications (email, token, user_type, expires_at, is_verified) VALUES (?, 'otp-verified', 'patient', ?, 1)", (email, expires_at))
+                    conn.commit()
+                    conn.close()
+                    return jsonify({"message": "OTP verified successfully!", "verified": True}), 200
+        except Exception as cloud_err:
+            print(f"[VERIFY OTP CLOUD FALLBACK NOTE] {cloud_err}")
+
     if not record:
         conn.close()
-        return jsonify({"error": "No active OTP found for this email. Please request a new OTP code."}), 400
+        return jsonify({"error": "No active OTP code found for this email. Please request a new code or click the email link."}), 400
 
     attempts = record['attempts'] + 1
 
@@ -978,39 +998,25 @@ def verify_otp():
         conn.execute("DELETE FROM email_otps WHERE email=?", (email,))
         conn.commit()
         conn.close()
-        print(f"[OTP BLOCKED] Email: {email} exceeded max 5 attempts.")
-        return jsonify({"error": "Maximum verification attempts (5) exceeded. Please request a new OTP."}), 400
+        return jsonify({"error": "Maximum verification attempts (5) exceeded. Please request a new code."}), 400
 
     conn.execute("UPDATE email_otps SET attempts=? WHERE email=?", (attempts, email))
     conn.commit()
 
-    # 5-minute expiry check
-    expires_at = datetime.fromisoformat(record['expires_at'])
-    if datetime.now() > expires_at:
-        conn.execute("DELETE FROM email_otps WHERE email=?", (email,))
-        conn.commit()
-        conn.close()
-        print(f"[OTP EXPIRED] Email: {email} expired (5-min limit).")
-        return jsonify({"error": "OTP code has expired (5-minute limit). Please request a new OTP."}), 400
-
     # OTP match check
-    if record['otp'] != otp:
+    if str(record['otp']).strip() != otp:
         conn.close()
-        print(f"[OTP MISMATCH] Email: {email} | Attempt: {attempts}/5")
-        return jsonify({"error": f"Invalid OTP code. {5 - attempts} attempts remaining."}), 400
+        print(f"[OTP MISMATCH] Email: {email} | Entered: '{otp}' | Expected: '{record['otp']}'")
+        return jsonify({"error": f"Invalid OTP code '{otp}'. Please check your email and try again."}), 400
 
-    # SUCCESS: Delete OTP after successful verification (Never reuse OTP)
+    # SUCCESS: Mark email_verifications as verified!
+    expires_at = (datetime.now() + timedelta(days=365)).isoformat()
+    conn.execute("INSERT OR REPLACE INTO email_verifications (email, token, user_type, expires_at, is_verified) VALUES (?, 'otp-verified', 'patient', ?, 1)", (email, expires_at))
     conn.execute("DELETE FROM email_otps WHERE email=?", (email,))
     conn.commit()
     conn.close()
 
-    if db_firestore:
-        try:
-            db_firestore.collection('email_otps').document(email).delete()
-        except Exception:
-            pass
-
-    print(f"[OTP VERIFIED] Email: {email} | Verified successfully and deleted from database.")
+    print(f"[OTP VERIFIED SUCCESS] Email: {email} verified successfully via 6-digit OTP!")
     return jsonify({"message": "OTP verified successfully!", "verified": True}), 200
 
 
