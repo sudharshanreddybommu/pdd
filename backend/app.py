@@ -725,6 +725,7 @@ def send_verification_link_via_brevo(to_email, token, user_type="patient"):
 
 # ─── AUTH ROUTES ──────────────────────────────────────────────────────────────
 
+@app.route('/send-verification-link', methods=['POST'])
 @app.route('/api/send-verification-link', methods=['POST'])
 def send_verification_link():
     data = request.get_json() or {}
@@ -756,6 +757,7 @@ def send_verification_link():
     }), 200
 
 
+@app.route('/verify-email-token', methods=['GET', 'POST'])
 @app.route('/api/verify-email-token', methods=['GET', 'POST'])
 def verify_email_token():
     if request.method == 'POST':
@@ -792,6 +794,7 @@ def verify_email_token():
     }), 200
 
 
+@app.route('/check-email-verification-status', methods=['GET'])
 @app.route('/api/check-email-verification-status', methods=['GET'])
 def check_email_verification_status():
     email = request.args.get('email', '').strip().lower()
