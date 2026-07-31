@@ -632,12 +632,9 @@ def ai_predict(left_img_b64, front_img_b64, right_img_b64, symptoms=None):
 
 
 def send_verification_link_via_brevo(to_email, token, user_type="patient"):
-    # Frontend base URL (supports local dev + production)
-    frontend_host = request.host_url.rstrip('/') if request else "http://localhost:5173"
-    if "localhost:5000" in frontend_host or "127.0.0.1:5000" in frontend_host:
-        frontend_host = "http://localhost:5173"
-    
-    verify_url = f"{frontend_host}/verify-email?token={token}&email={urllib.parse.quote(to_email)}&user_type={user_type}"
+    # Construct base backend URL (supports Render Cloud + Local Network IP)
+    backend_host = request.host_url.rstrip('/') if request else "https://oralscan-backend-gmup.onrender.com"
+    verify_url = f"{backend_host}/api/verify-email-token?token={token}&email={urllib.parse.quote(to_email)}&user_type={user_type}"
 
     html_content = f"""
     <html>
@@ -769,6 +766,8 @@ def verify_email_token():
         email = request.args.get('email', '').strip().lower()
 
     if not token or not email:
+        if request.method == 'GET':
+            return """<!DOCTYPE html><html><body style="background:#0f172a;color:#f1f5f9;font-family:sans-serif;text-align:center;padding:50px;"><h2>Invalid Verification Link</h2></body></html>""", 400
         return jsonify({"error": "Token and email are required"}), 400
 
     conn = get_db()
@@ -776,15 +775,46 @@ def verify_email_token():
 
     if not record:
         conn.close()
+        if request.method == 'GET':
+            return """<!DOCTYPE html><html><body style="background:#0f172a;color:#f1f5f9;font-family:sans-serif;text-align:center;padding:50px;"><h2>Invalid or Expired Link</h2></body></html>""", 400
         return jsonify({"error": "Invalid or expired verification link"}), 400
 
     if datetime.now() > datetime.fromisoformat(record['expires_at']):
         conn.close()
+        if request.method == 'GET':
+            return """<!DOCTYPE html><html><body style="background:#0f172a;color:#f1f5f9;font-family:sans-serif;text-align:center;padding:50px;"><h2>Verification Link Expired</h2></body></html>""", 400
         return jsonify({"error": "Verification link has expired. Please request a new link."}), 400
 
     conn.execute("UPDATE email_verifications SET is_verified=1 WHERE email=?", (email,))
     conn.commit()
     conn.close()
+
+    if request.method == 'GET':
+        return f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Email Verified — OralScan AI</title>
+          <style>
+            body {{ background: #0f172a; color: #f1f5f9; font-family: system-ui, -apple-system, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }}
+            .card {{ background: #1e293b; border-radius: 24px; padding: 40px 28px; text-align: center; max-width: 440px; width: 100%; border: 1px solid #334155; box-shadow: 0 20px 40px rgba(0,0,0,0.5); }}
+            .icon {{ font-size: 64px; margin-bottom: 16px; }}
+            h1 {{ font-size: 24px; margin: 0 0 12px; color: #38bdf8; font-weight: 800; }}
+            p {{ color: #94a3b8; font-size: 15px; line-height: 1.6; margin-bottom: 24px; }}
+            .badge {{ background: rgba(14,165,233,0.15); color: #38bdf8; padding: 8px 16px; border-radius: 20px; font-weight: bold; font-size: 14px; display: inline-block; margin-bottom: 20px; border: 1px solid rgba(14,165,233,0.3); }}
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <div class="icon">🎉</div>
+            <div class="badge">✓ EMAIL VERIFIED</div>
+            <h1>Verification Successful!</h1>
+            <p>Your email address <strong>{email}</strong> has been successfully verified for OralScan AI.<br><br>You can now return to the OralScan AI app on your phone or laptop to complete your registration!</p>
+          </div>
+        </body>
+        </html>
+        """
 
     return jsonify({
         "verified": True,
