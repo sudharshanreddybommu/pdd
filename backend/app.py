@@ -186,7 +186,7 @@ def init_db():
 
 
 def generate_otp():
-    return ''.join(random.choices(string.digits, k=6))
+    return str(random.randint(100000, 999999))
 
 
 def send_via_brevo_api(to_email, otp):
@@ -1005,8 +1005,12 @@ def verify_otp():
     conn.execute("UPDATE email_otps SET attempts=? WHERE email=?", (attempts, email))
     conn.commit()
 
-    # OTP match check
-    if str(record['otp']).strip() != otp:
+    # Format both record OTP and entered OTP with zfill(6) to handle any leading zero issues
+    expected_otp_str = str(record['otp']).strip().zfill(6)
+    entered_otp_str = str(otp).strip().zfill(6)
+
+    # OTP match check (allow zfill format, exact string, or raw int equality)
+    if expected_otp_str != entered_otp_str and str(record['otp']).strip() != str(otp).strip():
         conn.close()
         print(f"[OTP MISMATCH] Email: {email} | Entered: '{otp}' | Expected: '{record['otp']}'")
         return jsonify({"error": f"Invalid OTP code '{otp}'. Please check your email and try again."}), 400
