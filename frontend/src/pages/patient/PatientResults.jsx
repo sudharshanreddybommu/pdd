@@ -130,37 +130,74 @@ export default function PatientResults() {
 
   /* 🔊 Voice Audio Report Reader (Text-To-Speech in Selected Language) */
   const toggleSpeech = () => {
+    const langCodes = { en: 'en-US', te: 'te-IN', hi: 'hi-IN', ta: 'ta-IN', kn: 'kn-IN', ml: 'ml-IN' }
+    const targetLang = langCodes[lang] || 'en-US'
+    const reportText = `${t('resultsTitle')}. ${cfg.label}. ${displayTitle}. ${displayMessage}.`
+
+    // Fallback play function
+    const playFallback = () => {
+      if (window.activeAudioReport) {
+        window.activeAudioReport.pause()
+        window.activeAudioReport = null
+        setIsSpeaking(false)
+        return
+      }
+      const url = `https://translate.google.com/translate_tts?ie=UTF-8&tl=${targetLang.split('-')[0]}&client=tw-ob&q=${encodeURIComponent(reportText.substring(0, 200))}`
+      const audio = new Audio(url)
+      window.activeAudioReport = audio
+      setIsSpeaking(true)
+      audio.onended = () => {
+        setIsSpeaking(false)
+        window.activeAudioReport = null
+      }
+      audio.onerror = () => {
+        setIsSpeaking(false)
+        window.activeAudioReport = null
+      }
+      audio.play().catch(() => {
+        setIsSpeaking(false)
+        window.activeAudioReport = null
+      })
+    }
+
     if (!('speechSynthesis' in window)) {
-      alert('Text-to-speech is not supported on this browser.')
+      playFallback()
       return
     }
 
     if (isSpeaking) {
+      if (window.activeAudioReport) {
+        window.activeAudioReport.pause()
+        window.activeAudioReport = null
+      }
       window.speechSynthesis.cancel()
       setIsSpeaking(false)
       return
     }
 
-    const langCodes = { en: 'en-US', te: 'te-IN', hi: 'hi-IN', ta: 'ta-IN', kn: 'kn-IN', ml: 'ml-IN' }
-    const reportText = `${t('resultsTitle')}. ${cfg.label}. ${displayTitle}. ${displayMessage}.`
+    try {
+      const utterance = new SpeechSynthesisUtterance(reportText)
+      utterance.lang = targetLang
+      utterance.rate = 0.85
 
-    const utterance = new SpeechSynthesisUtterance(reportText)
-    const targetLang = langCodes[lang] || 'en-US'
-    utterance.lang = targetLang
-    utterance.rate = 0.85
+      const voices = window.speechSynthesis.getVoices()
+      const matchingVoice = voices.find(v => v.lang === targetLang || v.lang.startsWith(lang))
+      if (matchingVoice) {
+        utterance.voice = matchingVoice
+      }
 
-    // Find native voice for selected language if available
-    const voices = window.speechSynthesis.getVoices()
-    const matchingVoice = voices.find(v => v.lang === targetLang || v.lang.startsWith(lang))
-    if (matchingVoice) {
-      utterance.voice = matchingVoice
+      utterance.onend = () => setIsSpeaking(false)
+      utterance.onerror = () => {
+        console.warn('Native speech failed, trying fallback...')
+        playFallback()
+      }
+
+      setIsSpeaking(true)
+      window.speechSynthesis.speak(utterance)
+    } catch (e) {
+      console.warn('Native speech error, trying fallback...', e)
+      playFallback()
     }
-
-    utterance.onend = () => setIsSpeaking(false)
-    utterance.onerror = () => setIsSpeaking(false)
-
-    setIsSpeaking(true)
-    window.speechSynthesis.speak(utterance)
   }
 
   const openReport = () => {
