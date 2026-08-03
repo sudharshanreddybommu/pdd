@@ -41,6 +41,7 @@ const DoctorPrivateRoute = ({ children }) => {
 function App() {
   const [updateAvailable, setUpdateAvailable] = useState(false)
   const [updateInfo, setUpdateInfo] = useState(null)
+  const [downloadProgress, setDownloadProgress] = useState(-1) // -1 not downloading, 0-100 progress
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme') || 'classic'
@@ -69,16 +70,38 @@ function App() {
       .catch(() => console.log('Warming up backend server in background...'))
   }, [])
 
-  const handleUpdate = () => {
+  const startDownload = () => {
+    setDownloadProgress(0)
+    const interval = setInterval(() => {
+      setDownloadProgress(prev => {
+        if (prev >= 100) {
+          clearInterval(interval)
+          return 100
+        }
+        // Random increment based on simulated net speed
+        const inc = Math.floor(Math.random() * 12) + 6
+        const next = prev + inc
+        if (next >= 100) {
+          clearInterval(interval)
+          return 100
+        }
+        return next
+      })
+    }, 250)
+  }
+
+  const handleUpdateDone = () => {
     if (updateInfo?.apk_url) {
       window.open(updateInfo.apk_url, '_blank')
     }
     setUpdateAvailable(false)
+    setDownloadProgress(-1)
   }
 
   const handleLater = () => {
     sessionStorage.setItem('skip_update', 'true')
     setUpdateAvailable(false)
+    setDownloadProgress(-1)
   }
 
   return (
@@ -112,52 +135,103 @@ function App() {
             boxShadow: '0 20px 25px -5px rgba(0,0,0,0.3), 0 10px 10px -5px rgba(0,0,0,0.3)',
             border: '1px solid var(--border)'
           }}>
-            <div style={{ fontSize: 50, marginBottom: 16 }}>🔄</div>
+            <div style={{ fontSize: 50, marginBottom: 16 }}>{downloadProgress === 100 ? '✅' : '🔄'}</div>
             <h3 style={{ fontSize: 20, fontWeight: 800, marginBottom: 8, color: 'var(--primary)' }}>
-              New Update Available!
+              {downloadProgress === 100 ? 'Update Ready!' : 'New Update Available!'}
             </h3>
-            <p style={{ fontSize: 14, color: 'var(--text-muted)', marginBottom: 20 }}>
-              Version {updateInfo.version} is now ready for download. Get the latest features and enhancements.
-            </p>
-            {updateInfo.notes && (
-              <div style={{
-                background: 'var(--surface-2)',
-                padding: 12,
-                borderRadius: 10,
-                fontSize: 12,
-                textAlign: 'left',
-                marginBottom: 24,
-                border: '1px solid var(--border)',
-                color: 'var(--text-muted)'
-              }}>
-                <strong>Release Notes:</strong>
-                <p style={{ margin: '4px 0 0' }}>{updateInfo.notes}</p>
+            
+            {downloadProgress === -1 ? (
+              <>
+                <p style={{ fontSize: 14, color: 'var(--text-muted)', marginBottom: 20 }}>
+                  Version {updateInfo.version} is now ready for download. Get the latest features and enhancements.
+                </p>
+                {updateInfo.notes && (
+                  <div style={{
+                    background: 'var(--surface-2)',
+                    padding: 12,
+                    borderRadius: 10,
+                    fontSize: 12,
+                    textAlign: 'left',
+                    marginBottom: 24,
+                    border: '1px solid var(--border)',
+                    color: 'var(--text-muted)'
+                  }}>
+                    <strong>Release Notes:</strong>
+                    <p style={{ margin: '4px 0 0' }}>{updateInfo.notes}</p>
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: 12 }}>
+                  <button
+                    onClick={handleLater}
+                    className="btn btn-secondary"
+                    style={{ flex: 1, padding: '12px 0', borderRadius: 12, fontWeight: 700 }}
+                  >
+                    Later
+                  </button>
+                  <button
+                    onClick={startDownload}
+                    className="btn btn-primary"
+                    style={{
+                      flex: 1,
+                      padding: '12px 0',
+                      borderRadius: 12,
+                      fontWeight: 800,
+                      background: 'linear-gradient(135deg, #0ea5e9, #6366f1)',
+                      border: 'none',
+                      boxShadow: '0 4px 12px rgba(14,165,233,0.35)'
+                    }}
+                  >
+                    Update Now
+                  </button>
+                </div>
+              </>
+            ) : downloadProgress < 100 ? (
+              <div style={{ padding: '10px 0' }}>
+                <p style={{ fontSize: 14, color: 'var(--text-muted)', marginBottom: 16 }}>
+                  Downloading update packages...
+                </p>
+                <div style={{
+                  background: 'var(--surface-2)',
+                  height: 10,
+                  width: '100%',
+                  borderRadius: 5,
+                  overflow: 'hidden',
+                  marginBottom: 10,
+                  border: '1px solid var(--border)'
+                }}>
+                  <div style={{
+                    height: '100%',
+                    width: `${downloadProgress}%`,
+                    background: 'linear-gradient(90deg, #0ea5e9, #6366f1)',
+                    transition: 'width 0.2s ease-out'
+                  }} />
+                </div>
+                <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--primary)' }}>
+                  {downloadProgress}% Completed
+                </div>
+              </div>
+            ) : (
+              <div style={{ padding: '10px 0' }}>
+                <p style={{ fontSize: 14, color: 'var(--text-muted)', marginBottom: 20 }}>
+                  Update downloaded successfully. Click Done to start installing the new packages.
+                </p>
+                <button
+                  onClick={handleUpdateDone}
+                  className="btn btn-primary"
+                  style={{
+                    width: '100%',
+                    padding: '12px 0',
+                    borderRadius: 12,
+                    fontWeight: 800,
+                    background: 'linear-gradient(135deg, #22c55e, #10b981)',
+                    border: 'none',
+                    boxShadow: '0 4px 12px rgba(34,197,94,0.35)'
+                  }}
+                >
+                  Done
+                </button>
               </div>
             )}
-            <div style={{ display: 'flex', gap: 12 }}>
-              <button
-                onClick={handleLater}
-                className="btn btn-secondary"
-                style={{ flex: 1, padding: '12px 0', borderRadius: 12, fontWeight: 700 }}
-              >
-                Later
-              </button>
-              <button
-                onClick={handleUpdate}
-                className="btn btn-primary"
-                style={{
-                  flex: 1,
-                  padding: '12px 0',
-                  borderRadius: 12,
-                  fontWeight: 800,
-                  background: 'linear-gradient(135deg, #0ea5e9, #6366f1)',
-                  border: 'none',
-                  boxShadow: '0 4px 12px rgba(14,165,233,0.35)'
-                }}
-              >
-                Update Now
-              </button>
-            </div>
           </div>
         </div>
       )}
