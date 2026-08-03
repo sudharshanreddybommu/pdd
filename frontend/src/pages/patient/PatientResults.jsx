@@ -120,6 +120,9 @@ export default function PatientResults() {
   const isMod = result.risk_level === 'moderate'
   const diseases = result.detected_diseases || []
   const detected = diseases.filter(d => d.confidence >= 50)
+  const displayConfidence = typeof result.confidence === 'string' && result.confidence.endsWith('%')
+    ? result.confidence.slice(0, -1)
+    : result.confidence
 
   // Dynamic Translated Titles & Messages
   const displayTitle = cfg.title[lang] || cfg.title.en
@@ -266,7 +269,7 @@ export default function PatientResults() {
           {/* Stats Row */}
           <div style={{ display: 'inline-flex', gap: 28, justifyContent: 'center', flexWrap: 'wrap', alignItems: 'center' }}>
             <div>
-              <div style={{ fontSize: 28, fontWeight: 800, color: cfg.color }}>{result.confidence}%</div>
+              <div style={{ fontSize: 28, fontWeight: 800, color: cfg.color }}>{displayConfidence}%</div>
               <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('aiConfidence')}</div>
             </div>
             <div style={{ width: 1, height: 40, background: 'var(--border)' }} />

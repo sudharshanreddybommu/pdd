@@ -579,7 +579,7 @@ def ai_predict(left_img_b64, front_img_b64, right_img_b64, symptoms=None):
             "Stay well hydrated by drinking 8–10 glasses of water daily",
             "Schedule a routine preventive oral health screening every 6 months"
         ]
-        confidence = round(min(98.5, max(75.0, 94.0 - (score * 0.4) + delta)), 1)
+        confidence = round(min(98.0, max(80.0, 90.0 + (delta * 8.0))), 1)
     elif score < 65:
         risk_level = "moderate"
         if has_white:

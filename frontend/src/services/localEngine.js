@@ -192,7 +192,7 @@ export const executeLocalFallback = async (endpoint, data = {}, method = 'POST')
       confidence = max_prob;
     } else {
       risk_level = 'low';
-      confidence = Math.max(75.0, 94.0 - max_prob + delta);
+      confidence = Math.min(98.0, Math.max(80.0, 90.0 + (delta * 8.0)));
     }
 
     detected_diseases = [
