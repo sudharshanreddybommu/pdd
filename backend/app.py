@@ -1987,7 +1987,16 @@ def clear_notifications():
     return jsonify({"message": "Notifications cleared successfully"}), 200
 
 
-# ─── ADMIN ────────────────────────────────────────────────────────────────────
+@app.route('/api/app-version', methods=['GET'])
+def get_app_version():
+    return jsonify({
+        "version": "1.0.1",
+        "apk_url": "https://github.com/sudharshanreddybommu/pdd/raw/main/frontend/android/app/build/outputs/apk/debug/app-debug.apk",
+        "notes": "Features updated: Dynamic AI prediction percentages and clean appointments!"
+    }), 200
+
+
+# ─── MAIN ─────────────────────────────────────────────────────────────────────
 
 @app.route('/api/admin/verify-doctor/<int:doctor_id>', methods=['PUT'])
 def admin_verify_doctor(doctor_id):

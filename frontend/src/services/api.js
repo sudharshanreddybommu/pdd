@@ -81,4 +81,7 @@ export const clearNotifications = () => requestWithFallback('delete', '/notifica
 export const addReview = data => requestWithFallback('post', '/review/add', data)
 export const getDoctorReviews = id => requestWithFallback('get', `/doctor/${id}/reviews`)
 
+// Version Check
+export const getAppVersion = () => requestWithFallback('get', '/app-version')
+
 export default API
