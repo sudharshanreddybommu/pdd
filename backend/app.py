@@ -1219,6 +1219,7 @@ def analyze_scan():
 
 @app.route('/api/scan/<int:scan_id>/report', methods=['GET'])
 def download_scan_report(scan_id):
+    lang = request.args.get('lang', 'en')
     conn = get_db()
     scan = conn.execute("SELECT * FROM scans WHERE id=?", (scan_id,)).fetchone()
     if not scan:
@@ -1232,11 +1233,220 @@ def download_scan_report(scan_id):
     detected_diseases = json.loads(scan['detailed_report']) if scan['detailed_report'] else []
     suggestions = json.loads(scan['suggestions']) if scan['suggestions'] else []
     
+    # ─── TRANSLATION MAPS ─────────────────────────────────────────────────────
+    REPORT_TRANSLATIONS = {
+        'en': {
+            'title': 'OPMD AI Screening Analysis Report',
+            'patient_name': 'Patient Name',
+            'age': 'Age',
+            'email': 'Email',
+            'report_id': 'Report ID',
+            'date_generated': 'Date Generated',
+            'status': 'Status',
+            'clinical_screening': 'Clinical Screening',
+            'overall_assessment': 'Overall Assessment',
+            'risk': 'RISK',
+            'prediction_findings': 'AI Prediction & Findings',
+            'condition_breakdown': 'Condition Classification Breakdown',
+            'disease_condition': 'Disease / Condition',
+            'status_col': 'Status',
+            'prob_confidence': 'Probability Confidence',
+            'uploaded_views': 'Uploaded Scan Views',
+            'left_view': 'Left View',
+            'front_view': 'Front View',
+            'right_view': 'Right View',
+            'clinical_recs': 'Clinical Recommendations & Guidelines',
+            'disclaimer': 'Disclaimer: This screening report is automatically generated using simulated deep learning feature extraction based on current patient oral imagery. This screening does not constitute a primary medical diagnosis or histological confirmation. Any positive potential malignant finding (OSMF, Leukoplakia, etc.) should be immediately referred to an oral oncologist or dentist for physical examination and biopsy sign-off.',
+            'low': 'LOW',
+            'moderate': 'MODERATE',
+            'high': 'HIGH',
+            'present': 'Present',
+            'detected': 'Detected',
+            'not_detected': 'Not Detected'
+        },
+        'te': {
+            'title': 'OPMD AI స్క్రీనింగ్ విశ్లేషణ నివేదిక',
+            'patient_name': 'రోగి పేరు',
+            'age': 'వయస్సు',
+            'email': 'ఈమెయిల్',
+            'report_id': 'రిపోర్ట్ ఐడి',
+            'date_generated': 'తేదీ',
+            'status': 'స్థితి',
+            'clinical_screening': 'క్లినికల్ స్క్రీనింగ్',
+            'overall_assessment': 'మొత్తం అంచనా',
+            'risk': 'ప్రమాదం',
+            'prediction_findings': 'AI అంచనా & పరిశోధనలు',
+            'condition_breakdown': 'వ్యాధి వర్గీకరణ వివరాలు',
+            'disease_condition': 'వ్యాధి / పరిస్థితి',
+            'status_col': 'స్థితి',
+            'prob_confidence': 'అంచనా ఖచ్చితత్వం',
+            'uploaded_views': 'అప్‌లోడ్ చేసిన స్కాన్ ఫోటోలు',
+            'left_view': 'ఎడమ వైపు దృశ్యం',
+            'front_view': 'ముందు వైపు దృశ్యం',
+            'right_view': 'కుడి వైపు దృశ్యం',
+            'clinical_recs': 'క్లినికల్ సిఫార్సులు & మార్గదర్శకాలు',
+            'disclaimer': 'గమనిక: ఈ స్క్రీనింగ్ నివేదిక ఆటోమేటిక్‌గా కృత్రిమ మేధస్సు ద్వారా తయారు చేయబడింది. ఇది వైద్యుడి తుది నిర్ధారణ కాదు. ఏదైనా వ్యాధి లక్షణాలు కనిపిస్తే వెంటనే డెంటిస్ట్ లేదా క్యాన్సర్ నిపుణుడిని సంప్రదించండి.',
+            'low': 'తక్కువ',
+            'moderate': 'మధ్యస్థం',
+            'high': 'అధికం',
+            'present': 'ఉంది',
+            'detected': 'గుర్తించబడింది',
+            'not_detected': 'గుర్తించబడలేదు'
+        },
+        'hi': {
+            'title': 'ओपीएमडी एआई स्क्रीनिंग विश्लेषण रिपोर्ट',
+            'patient_name': 'मरीज का नाम',
+            'age': 'आयु',
+            'email': 'ईमेल',
+            'report_id': 'रिपोर्ट आईडी',
+            'date_generated': 'दिनांक',
+            'status': 'स्थिति',
+            'clinical_screening': 'नैदानिक ​​स्क्रीनिंग',
+            'overall_assessment': 'कुल मूल्यांकन',
+            'risk': 'जोखिम',
+            'prediction_findings': 'एआई भविष्यवाणी और निष्कर्ष',
+            'condition_breakdown': 'रोग वर्गीकरण विवरण',
+            'disease_condition': 'रोग / स्थिति',
+            'status_col': 'स्थिति',
+            'prob_confidence': 'सटीकता प्रतिशत',
+            'uploaded_views': 'अपलोड किए गए स्कैन फोटो',
+            'left_view': 'बायां दृश्य',
+            'front_view': 'सामने का दृश्य',
+            'right_view': 'दायां दृश्य',
+            'clinical_recs': 'नैदानिक ​​सिफारिशें और दिशानिर्देश',
+            'disclaimer': 'अस्वीकरण: यह रिपोर्ट एआई द्वारा स्वचालित रूप से तैयार की गई है। यह अंतिम चिकित्सा निदान नहीं है। किसी भी समस्या के मामले में तुरंत डॉक्टर से संपर्क करें।',
+            'low': 'कम',
+            'moderate': 'मध्यम',
+            'high': 'उच्च',
+            'present': 'मौजूद',
+            'detected': 'पाया गया',
+            'not_detected': 'नहीं पाया गया'
+        },
+        'ta': {
+            'title': 'OPMD AI ஸ்கிரீனிங் பகுப்பாய்வு அறிக்கை',
+            'patient_name': 'நோயாளி பெயர்',
+            'age': 'வயது',
+            'email': 'மின்னஞ்சல்',
+            'report_id': 'அறிக்கை ஐடி',
+            'date_generated': 'தேதி',
+            'status': 'நிலை',
+            'clinical_screening': 'மருத்துவ பரிசோதனை',
+            'overall_assessment': 'ஒட்டுமொத்த மதிப்பீடு',
+            'risk': 'ஆபத்து',
+            'prediction_findings': 'AI கணிப்பு & கண்டுபிடிப்புகள்',
+            'condition_breakdown': 'நோய் வகைப்பாடு விவரங்கள்',
+            'disease_condition': 'நோய் / நிலை',
+            'status_col': 'நிலை',
+            'prob_confidence': 'கணிப்பு துல்லியம்',
+            'uploaded_views': 'பதிவேற்றப்பட்ட ஸ்கேன் படங்கள்',
+            'left_view': 'இடது காட்சி',
+            'front_view': 'முன் காட்சி',
+            'right_view': 'வலது காட்சி',
+            'clinical_recs': 'மருத்துவ பரிந்துரைகள் & வழிகாட்டுதல்கள்',
+            'disclaimer': 'பொறுப்புத் துறப்பு: இந்த அறிக்கை AI ஆல் தானாகவே உருவாக்கப்பட்டது. இது இறுதி மருத்துவ நோயறிதல் அல்ல. ஏதேனும் பிரச்சனை இருந்தால் உடனே மருத்துவரை அணுகவும்.',
+            'low': 'குறைந்த',
+            'moderate': 'மிதமான',
+            'high': 'அதிக',
+            'present': 'உள்ளது',
+            'detected': 'கண்டறியப்பட்டது',
+            'not_detected': 'கண்டறியப்படவில்லை'
+        },
+        'kn': {
+            'title': 'OPMD AI ಸ್ಕ್ರೀನಿಂಗ್ ವಿಶ್ಲೇಷಣೆ ವರದಿ',
+            'patient_name': 'ರೋಗಿಯ ಹೆಸರು',
+            'age': 'ವಯಸ್ಸು',
+            'email': 'ಇಮೇಲ್',
+            'report_id': 'ವರದಿ ಐಡಿ',
+            'date_generated': 'ದಿನಾಂక',
+            'status': 'ಸ್ಥಿತಿ',
+            'clinical_screening': 'ಕ್ಲಿನಿಕಲ್ ಸ್ಕ್ರೀನಿಂಗ್',
+            'overall_assessment': 'ಒಟ್ಟಾರೆ ಮೌಲ್ಯಮಾಪನ',
+            'risk': 'ಅಪಾಯ',
+            'prediction_findings': 'AI ಮುನ್ಸೂಚನೆ ಮತ್ತು ಸಂಶೋಧನೆಗಳು',
+            'condition_breakdown': 'ರೋಗ ವರ್ಗೀಕರಣದ ವಿವರಗಳು',
+            'disease_condition': 'ರೋಗ / ಸ್ಥಿತಿ',
+            'status_col': 'ಸ್ಥಿತಿ',
+            'prob_confidence': 'ನಿಖರತೆಯ ಶೇಕಡಾವಾರು',
+            'uploaded_views': 'ಅಪ್‌ಲೋಡ್ ಮಾಡಿದ ಸ್ಕ್ಯಾನ್ ಫೋಟೋಗಳು',
+            'left_view': 'ಎಡ ನೋಟ',
+            'front_view': 'ಮುಂಭಾಗದ ನೋಟ',
+            'right_view': 'ಬಲ ನೋಟ',
+            'clinical_recs': 'ಕ್ಲಿನಿಕಲ್ ಶಿಫಾರಸುಗಳು ಮತ್ತು ಮಾರ್ಗಸೂಚಿಗಳು',
+            'disclaimer': 'ಹಕ್ಕು ನಿರಾಕರಣೆ: ಈ ವರದಿಯನ್ನು AI ಸ್ವಯಂಚಾಲಿತವಾಗಿ ಸಿದ್ಧಪಡಿಸಿದೆ. ಇದು ಅಂತಿಮ ವೈದ್ಯಕೀಯ ರೋಗನಿರ್ಣಯವಲ್ಲ. ಯಾವುದೇ ಸಮಸ್ಯೆಯಿದ್ದಲ್ಲಿ ತಕ್ಷಣ ವೈದ್ಯರನ್ನು ಸಂಪರ್ಕಿಸಿ.',
+            'low': 'ಕಡಿಮೆ',
+            'moderate': 'ಮಧ್ಯಮ',
+            'high': 'ಹೆಚ್ಚಿನ',
+            'present': 'ಇದೆ',
+            'detected': 'ಪತ್ತೆಯಾಗಿದೆ',
+            'not_detected': 'ಪತ್ತೆಯಾಗಿಲ್ಲ'
+        },
+        'ml': {
+            'title': 'OPMD AI സ്ക്രീനിംഗ് വിശകലന റിപ്പോർട്ട്',
+            'patient_name': 'രോഗിയുടെ പേര്',
+            'age': 'വയസ്സ്',
+            'email': 'ഇമെയിൽ',
+            'report_id': 'റിപ്പോർട്ട് ഐഡി',
+            'date_generated': 'തീയതി',
+            'status': 'സ്ഥിതി',
+            'clinical_screening': 'ക്ലിനിക്കൽ സ്ക്രീനിംഗ്',
+            'overall_assessment': 'മൊത്തത്തിലുള്ള വിലയിരുത്തൽ',
+            'risk': 'അപകടസാധ്യത',
+            'prediction_findings': 'AI പ്രവചനവും കണ്ടെത്തലുകളും',
+            'condition_breakdown': 'രോഗ വർഗ്ഗീകരണ വിവരങ്ങൾ',
+            'disease_condition': 'രോഗം / അവസ്ഥ',
+            'status_col': 'സ്ഥിതി',
+            'prob_confidence': 'കൃത്യത ശതമാനം',
+            'uploaded_views': 'അപ്‌ലോഡ് ചെയ്ത സ്കാൻ ഫോട്ടോകൾ',
+            'left_view': 'ഇടത് കാഴ്ച',
+            'front_view': 'മുൻ കാഴ്ച',
+            'right_view': 'വലത് കാഴ്ച',
+            'clinical_recs': 'ക്ലിനിക്കൽ ശുപാർശകളും മാർഗ്ഗനിർദ്ദേശങ്ങളും',
+            'disclaimer': 'നിരാകരണം: ഈ റിപ്പോർട്ട് AI സ്വയമേവ തയ്യാറാക്കിയതാണ്. ഇത് അന്തിമ മെഡിക്കൽ രോഗനിർണയമല്ല. എന്തെങ്കിലും പ്രശ്നമുണ്ടെങ്കിൽ ഉടൻ തന്നെ ഡോക്ടറെ കാണുക.',
+            'low': 'കുറഞ്ഞ',
+            'moderate': 'മിതമായ',
+            'high': 'ഉയർന്ന',
+            'present': 'ഉണ്ട്',
+            'detected': 'കണ്ടെത്തി',
+            'not_detected': 'കണ്ടെത്തിയില്ല'
+        }
+    }
+
+    DISEASE_NAME_TRANSLATIONS = {
+        'te': {
+            'White Patch': 'తెల్లటి మచ్చ (White Patch)',
+            'Ulcer': 'నోటి పూత (Ulcer)',
+            'Leukoplakia': 'ల్యూకోప్లాకియా (Leukoplakia)',
+            'Erythroplakia': 'ఎరిథ్రోప్లాకియా (Erythroplakia)',
+            'OSMF': 'OSMF (నోరు తెరవడంలో ఇబ్బంది)',
+            'Lichen Planus': 'లైకెన్ ప్లానస్ (Lichen Planus)',
+            'Suspicious Lesion': 'అనుమానాస్పద గాయం (Suspicious Lesion)',
+            'Early Oral Cancer': 'ప్రారంభ నోటి క్యాన్సర్ (Early Oral Cancer)'
+        },
+        'hi': {
+            'White Patch': 'सफ़ेद धब्बा (White Patch)',
+            'Ulcer': 'छाला (Ulcer)',
+            'Leukoplakia': 'ल्यूकोप्लाकिया (Leukoplakia)',
+            'Erythroplakia': 'एरिथ्रोप्लाकिया (Erythroplakia)',
+            'OSMF': 'ओएसएमएफ (OSMF)',
+            'Lichen Planus': 'लाइकेन प्लेनस (Lichen Planus)',
+            'Suspicious Lesion': 'संदेहजनक घाव (Suspicious Lesion)',
+            'Early Oral Cancer': 'प्रारंभिक मौखिक कैंसर (Early Oral Cancer)'
+        }
+    }
+
+    t = REPORT_TRANSLATIONS.get(lang, REPORT_TRANSLATIONS['en'])
+    d_trans = DISEASE_NAME_TRANSLATIONS.get(lang, {})
+
+    # Translate risk status value
+    raw_risk = scan['risk_level'].lower()
+    translated_risk_label = t.get(raw_risk, raw_risk.upper())
+
     # Create HTML
     html = f"""
     <!DOCTYPE html>
     <html>
     <head>
+        <meta charset="utf-8">
         <title>OralScan AI - Medical Report</title>
         <style>
             body {{
@@ -1410,36 +1620,36 @@ def download_scan_report(scan_id):
 
         <div class="header">
             <div class="logo">🦷 OralScan <span>AI</span></div>
-            <div class="report-title">OPMD AI Screening Analysis Report</div>
+            <div class="report-title">{t['title']}</div>
         </div>
 
         <div class="meta-grid">
             <div class="meta-item">
-                <div><span class="meta-label">Patient Name:</span> {patient['name'] or 'Patient'}</div>
-                <div><span class="meta-label">Age:</span> {patient['age'] or 'N/A'}</div>
-                <div><span class="meta-label">Email:</span> {patient['email']}</div>
+                <div><span class="meta-label">{t['patient_name']}:</span> {patient['name'] or 'Patient'}</div>
+                <div><span class="meta-label">{t['age']}:</span> {patient['age'] or 'N/A'}</div>
+                <div><span class="meta-label">{t['email']}:</span> {patient['email']}</div>
             </div>
             <div class="meta-item" style="text-align: right;">
-                <div><span class="meta-label">Report ID:</span> #OS-{scan['id']}</div>
-                <div><span class="meta-label">Date Generated:</span> {scan['created_at']}</div>
-                <div><span class="meta-label">Status:</span> Clinical Screening</div>
+                <div><span class="meta-label">{t['report_id']}:</span> #OS-{scan['id']}</div>
+                <div><span class="meta-label">{t['date_generated']}:</span> {scan['created_at']}</div>
+                <div><span class="meta-label">{t['status']}:</span> {t['clinical_screening']}</div>
             </div>
         </div>
 
         <div class="risk-banner risk-{scan['risk_level']}">
-            Overall Assessment: {scan['risk_level'].upper()} RISK
+            {t['overall_assessment']}: {translated_risk_label} {t['risk']}
         </div>
 
-        <div class="section-title">AI Prediction & Findings</div>
+        <div class="section-title">{t['prediction_findings']}</div>
         <p style="font-size: 15px; line-height: 1.6; margin-bottom: 25px;">{scan['prediction']}</p>
 
-        <div class="section-title">Condition Classification Breakdown</div>
+        <div class="section-title">{t['condition_breakdown']}</div>
         <table class="disease-list">
             <thead>
                 <tr>
-                    <th>Disease / Condition</th>
-                    <th>Status</th>
-                    <th>Probability Confidence</th>
+                    <th>{t['disease_condition']}</th>
+                    <th>{t['status_col']}</th>
+                    <th>{t['prob_confidence']}</th>
                 </tr>
             </thead>
             <tbody>
@@ -1447,10 +1657,14 @@ def download_scan_report(scan_id):
     
     for d in detected_diseases:
         fill_class = "fill-high" if d['confidence'] > 50 else "fill-low"
+        translated_name = d_trans.get(d['name'], d['name'])
+        status_key = 'detected' if d['confidence'] > 50 else 'not_detected'
+        translated_status = t.get(status_key, d['status'])
+        
         html += f"""
                 <tr>
-                    <td style="font-weight: 500;">{d['name']}</td>
-                    <td><span style="color: {'#b91c1c' if d['confidence'] > 50 else '#15803d'}; font-weight: bold;">{d['status']}</span></td>
+                    <td style="font-weight: 500;">{translated_name}</td>
+                    <td><span style="color: {'#b91c1c' if d['confidence'] > 50 else '#15803d'}; font-weight: bold;">{translated_status}</span></td>
                     <td>
                         <div class="progress-bar-bg">
                             <div class="progress-bar-fill {fill_class}" style="width: {d['confidence']}%"></div>
@@ -1464,7 +1678,7 @@ def download_scan_report(scan_id):
             </tbody>
         </table>
 
-        <div class="section-title">Uploaded Scan Views</div>
+        <div class="section-title">{t['uploaded_views']}</div>
         <div class="image-grid">
     """
     
@@ -1472,28 +1686,28 @@ def download_scan_report(scan_id):
         html += f"""
             <div class="image-card">
                 <img class="image-preview" src="{scan['left_image']}">
-                <div class="image-label">Left View</div>
+                <div class="image-label">{t['left_view']}</div>
             </div>
         """
     if scan['front_image']:
         html += f"""
             <div class="image-card">
                 <img class="image-preview" src="{scan['front_image']}">
-                <div class="image-label">Front View</div>
+                <div class="image-label">{t['front_view']}</div>
             </div>
         """
     if scan['right_image']:
         html += f"""
             <div class="image-card">
                 <img class="image-preview" src="{scan['right_image']}">
-                <div class="image-label">Right View</div>
+                <div class="image-label">{t['right_view']}</div>
             </div>
         """
         
     html += f"""
         </div>
 
-        <div class="section-title">Clinical Recommendations & Guidelines</div>
+        <div class="section-title">{t['clinical_recs']}</div>
         <ul class="suggestions-list">
     """
     
@@ -1504,7 +1718,7 @@ def download_scan_report(scan_id):
         </ul>
 
         <div class="footer-disclaimer">
-            Disclaimer: This screening report is automatically generated using simulated deep learning feature extraction based on current patient oral imagery. This screening does not constitute a primary medical diagnosis or histological confirmation. Any positive potential malignant finding (OSMF, Leukoplakia, etc.) should be immediately referred to an oral oncologist or dentist for physical examination and biopsy sign-off.
+            {t['disclaimer']}
         </div>
 
         <script>

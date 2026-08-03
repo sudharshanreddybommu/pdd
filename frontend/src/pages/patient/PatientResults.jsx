@@ -162,7 +162,7 @@ export default function PatientResults() {
 
   const openReport = () => {
     if (scanId) {
-      window.open(`${API_URL}/api/scan/${scanId}/report`, '_blank')
+      window.open(`${API_URL}/api/scan/${scanId}/report?lang=${lang}`, '_blank')
     } else {
       setShowFindingsModal(true)
     }
