@@ -26,7 +26,7 @@ import './App.css'
 import { useEffect, useState } from 'react'
 import { getAppVersion } from './services/api'
 
-const CURRENT_VERSION = '1.0.1'
+const CURRENT_VERSION = '1.0.2'
 
 const PatientPrivateRoute = ({ children }) => {
   const token = localStorage.getItem('patientToken')

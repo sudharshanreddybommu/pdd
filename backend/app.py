@@ -2204,9 +2204,9 @@ def clear_notifications():
 @app.route('/api/app-version', methods=['GET'])
 def get_app_version():
     return jsonify({
-        "version": "1.0.1",
-        "apk_url": "https://github.com/sudharshanreddybommu/pdd/raw/main/frontend/android/app/build/outputs/apk/debug/app-debug.apk",
-        "notes": "Features updated: Dynamic AI prediction percentages and clean appointments!"
+        "version": "1.0.2",
+        "apk_url": "https://github.com/sudharshanreddybommu/pdd/raw/main/OralScan_AI_App.apk",
+        "notes": "Doctor portal fix, web text-to-speech speaker fix, and dynamic AI percentages!"
     }), 200
 
 
