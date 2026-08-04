@@ -192,6 +192,8 @@ export default function PatientResults() {
         playFallback()
       }
 
+      window.speechSynthesis.cancel()
+      window.speechSynthesis.resume()
       setIsSpeaking(true)
       window.speechSynthesis.speak(utterance)
     } catch (e) {

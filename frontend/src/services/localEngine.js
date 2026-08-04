@@ -278,6 +278,27 @@ export const executeLocalFallback = async (endpoint, data = {}, method = 'POST')
     return { data: { message: "Appointment booked successfully", appointment: newAppt } };
   }
 
+  // Doctor Appointments
+  if (endpoint.includes('/doctor/appointments')) {
+    const appts = getItem('local_doctor_appointments', [
+      {
+        id: 201,
+        patient_name: "Rahul Kumar",
+        patient_phone: "9876543210",
+        patient_age: 34,
+        status: "pending",
+        scheduled_date: new Date(Date.now() + 86400000).toISOString(),
+        created_at: new Date().toLocaleString()
+      }
+    ]);
+    return { data: appts };
+  }
+
+  // Doctor Action Operations (Schedule, Reject, Complete, Verify Payment)
+  if (endpoint.includes('/doctor/appointment/')) {
+    return { data: { message: "Operation completed successfully" } };
+  }
+
   // Patient Appointments
   if (endpoint.includes('/patient/appointments')) {
     const appts = getItem('local_appointments', [
