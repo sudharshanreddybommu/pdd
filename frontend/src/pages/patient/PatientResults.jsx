@@ -262,28 +262,7 @@ export default function PatientResults() {
             <p className="page-header-sub">{t('resultsSubtitle')}</p>
           </div>
 
-          {/* 🔊 Voice Audio Reader Control */}
-          <button
-            onClick={toggleSpeech}
-            style={{
-              background: isSpeaking ? 'var(--danger, #ef4444)' : 'linear-gradient(135deg, #0ea5e9, #6366f1)',
-              color: '#fff',
-              border: 'none',
-              borderRadius: 30,
-              padding: '10px 22px',
-              fontSize: 14,
-              fontWeight: 700,
-              cursor: 'pointer',
-              boxShadow: '0 4px 16px rgba(14,165,233,0.4)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              transition: 'all 0.2s'
-            }}
-          >
-            <span style={{ fontSize: 18 }}>{isSpeaking ? '⏹️' : '🔊'}</span>
-            <span>{isSpeaking ? t('stopAudio') : t('listenReport')}</span>
-          </button>
+
         </div>
 
         {/* ── Hero Risk Card ── */}

@@ -170,8 +170,15 @@ export const executeLocalFallback = async (endpoint, data = {}, method = 'POST')
     let confidence = 88.5;
     let detected_diseases = [];
 
-    // Calculate dynamic confidence scores for diseases
-    const delta = (Math.random() * 2) - 1.0; // small deterministic random variance
+    // Calculate dynamic confidence scores for diseases deterministically
+    const imgStr = data.left_image || data.front_image || data.right_image || '';
+    let hash = 0;
+    const combined = imgStr + JSON.stringify(symptoms);
+    for (let i = 0; i < combined.length; i++) {
+      hash = (hash << 5) - hash + combined.charCodeAt(i);
+      hash |= 0;
+    }
+    const delta = ((Math.abs(hash) % 100) / 100.0) * 2.0 - 1.0;
     const white_patch_prob = Math.min(96.5, Math.max(3.5, (82.5 * (has_white ? 1 : 0)) + (8.0 * (fb_tobacco ? 1 : 0)) + delta));
     const ulcer_prob = Math.min(96.5, Math.max(3.0, (84.0 * (fb_ulcer ? 1 : 0)) + (7.0 * (fb_pain ? 1 : 0)) + delta));
     const leukoplakia_prob = Math.min(96.5, Math.max(2.5, (88.5 * (has_white && fb_tobacco ? 1 : (has_white ? 0.6 : 0))) + delta));
