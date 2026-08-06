@@ -2204,9 +2204,9 @@ def clear_notifications():
 @app.route('/api/app-version', methods=['GET'])
 def get_app_version():
     return jsonify({
-        "version": "1.0.3",
+        "version": "1.0.4",
         "apk_url": "https://github.com/sudharshanreddybommu/pdd/raw/main/OralScan_AI_App.apk",
-        "notes": "Deterministic AI Predictions matched on web and phone, voice report speaker removed."
+        "notes": "Added persistent update dismissal using localStorage and bumped version."
     }), 200
 
 

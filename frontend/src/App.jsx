@@ -26,7 +26,7 @@ import './App.css'
 import { useEffect, useState } from 'react'
 import { getAppVersion } from './services/api'
 
-const CURRENT_VERSION = '1.0.3'
+const CURRENT_VERSION = '1.0.4'
 
 const PatientPrivateRoute = ({ children }) => {
   const token = localStorage.getItem('patientToken')
@@ -55,8 +55,8 @@ function App() {
     getAppVersion()
       .then(res => {
         if (res && res.data && res.data.version !== CURRENT_VERSION) {
-          const skipUpdate = sessionStorage.getItem('skip_update')
-          if (!skipUpdate) {
+          const dismissedVersion = localStorage.getItem('dismissed_update_version')
+          if (dismissedVersion !== res.data.version) {
             setUpdateInfo(res.data)
             setUpdateAvailable(true)
           }
@@ -99,7 +99,9 @@ function App() {
   }
 
   const handleLater = () => {
-    sessionStorage.setItem('skip_update', 'true')
+    if (updateInfo?.version) {
+      localStorage.setItem('dismissed_update_version', updateInfo.version)
+    }
     setUpdateAvailable(false)
     setDownloadProgress(-1)
   }
