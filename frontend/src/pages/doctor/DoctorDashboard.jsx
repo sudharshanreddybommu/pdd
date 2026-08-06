@@ -26,7 +26,13 @@ export default function DoctorDashboard() {
   const [scheduleForm, setScheduleForm] = useState({ date: '', notes: '' })
   const [expanded, setExpanded] = useState(null)
   const [viewScreenshot, setViewScreenshot] = useState(null) // { appt, src }
-  const doctor = JSON.parse(localStorage.getItem('doctorUser') || '{}')
+  let doctor = {}
+  try {
+    const raw = localStorage.getItem('doctorUser')
+    if (raw && raw !== 'undefined') doctor = JSON.parse(raw)
+  } catch (e) {
+    console.error(e)
+  }
 
   const formatDate = (dateString) => {
     if (!dateString) return '';
@@ -206,17 +212,17 @@ export default function DoctorDashboard() {
                           onClick={() => setViewScreenshot({ appt, src: appt.payment_screenshot })}
                         />
                         <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>🔍 Click image to enlarge • Verify if this is a genuine payment screenshot</div>
-                        <div style={{ display: 'flex', gap: 12 }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                           <button
                             onClick={() => handleVerifyPayment(appt.id, 'accept')}
                             className="btn btn-success"
-                            style={{ flex: 1, fontSize: 15, padding: '12px 0' }}>
+                            style={{ width: '100%', fontSize: 15, padding: '12px 0', borderRadius: 12 }}>
                             ✅ Accept Payment
                           </button>
                           <button
                             onClick={() => handleVerifyPayment(appt.id, 'reject')}
                             className="btn btn-danger"
-                            style={{ flex: 1, fontSize: 15, padding: '12px 0' }}>
+                            style={{ width: '100%', fontSize: 15, padding: '12px 0', borderRadius: 12 }}>
                             ❌ Reject Screenshot
                           </button>
                         </div>

@@ -285,6 +285,27 @@ export const executeLocalFallback = async (endpoint, data = {}, method = 'POST')
     return { data: { message: "Appointment booked successfully", appointment: newAppt } };
   }
 
+  // Doctor Profile Get/Update Fallbacks
+  if (endpoint.includes('/doctor/me')) {
+    const doc = getItem('local_doctor', {
+      name: "Dr. Rajesh Sharma",
+      phone: "9876543210",
+      hospital: "Apollo Dental Clinic",
+      address: "Road No. 12, Banjara Hills, Hyderabad",
+      specialization: "Oral Oncology",
+      consultation_fee: "500",
+      profile_image: "",
+      payment_qr: ""
+    });
+    return { data: doc };
+  }
+
+  if (endpoint.includes('/doctor/profile')) {
+    const doc = { ...getItem('local_doctor', {}), ...data };
+    setItem('local_doctor', doc);
+    return { data: { message: "Profile updated successfully", doctor: doc } };
+  }
+
   // Doctor Appointments
   if (endpoint.includes('/doctor/appointments')) {
     const appts = getItem('local_doctor_appointments', [

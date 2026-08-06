@@ -48,20 +48,20 @@ export const validateOralImage = (base64Str) => {
         const blueGreenRatio = blueGreen / total
         const greyRatio = neutralGrey / total
 
-        // Reject outdoor/clothes/blue-green (>12%)
-        if (blueGreenRatio > 0.12) {
+        // Allow medical blue/green backgrounds (common in dental clinics) up to 50%
+        if (blueGreenRatio > 0.50) {
           resolve(false)
           return
         }
 
-        // Reject documents/paper/grey objects (>32%)
-        if (greyRatio > 0.32) {
+        // Reject documents/paper/grey objects (>45%)
+        if (greyRatio > 0.45) {
           resolve(false)
           return
         }
 
-        // Must have at least 18% pink/red oral tissue
-        if (oralRatio < 0.18) {
+        // Must have at least 8% pink/red oral tissue
+        if (oralRatio < 0.08) {
           resolve(false)
           return
         }

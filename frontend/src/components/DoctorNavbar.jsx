@@ -7,7 +7,13 @@ export default function DoctorNavbar({ unread = 0 }) {
   const navigate = useNavigate()
   const location = useLocation()
   const [isOpen, setIsOpen] = useState(false)
-  const doctor = JSON.parse(localStorage.getItem('doctorUser') || '{}')
+  let doctor = {}
+  try {
+    const raw = localStorage.getItem('doctorUser')
+    if (raw && raw !== 'undefined') doctor = JSON.parse(raw)
+  } catch (e) {
+    console.error(e)
+  }
 
   useEffect(() => {
     setIsOpen(false)
